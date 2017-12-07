@@ -1,4 +1,7 @@
+#add_subdirectory(util)
+
 set(SOURCE_FILES
+  util/fs.cpp
   mp4_index_creator.cpp)
 
 # if (BUILD_CUDA)
@@ -23,7 +26,8 @@ add_library(hwang_source OBJECT
 set_source_files_properties(${PROTO_SRCS} ${GRPC_PROTO_SRCS} PROPERTIES
   GENERATED TRUE)
 
-add_executable(MP4IndexCreatorTest mp4_index_creator_test.cpp)
+add_executable(MP4IndexCreatorTest mp4_index_creator_test.cpp
+  ${SOURCE_FILES})
 target_link_libraries(MP4IndexCreatorTest
   ${GTEST_LIBRARIES} ${GTEST_LIB_MAIN})
 add_test(MP4IndexCreatorTest MP4IndexCreatorTest)

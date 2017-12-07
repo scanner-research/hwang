@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-namespace scanner {
+namespace hwang {
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Path utils
@@ -55,4 +55,5 @@ std::string download_temp(const std::string& url);
 void delete_file(const std::string& path);
 
 std::vector<uint8_t> read_entire_file(const std::string& file_name);
+
 }

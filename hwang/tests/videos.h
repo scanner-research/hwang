@@ -11,31 +11,26 @@
  * limitations under the License.
  */
 
-#include "hwang/mp4_index_creator.h"
 #include "hwang/util/fs.h"
-#include "hwang/tests/videos.h"
-
-#include <gtest/gtest.h>
 
 #include <thread>
 
 namespace hwang {
 
-TEST(MP4IndexCreator, SimpleTest) {
-  // Download video file
-  std::vector<uint8_t> video_bytes = read_entire_file(download_video(test_video));
+struct TestVideoInfo {
+  TestVideoInfo(const std::string &url) : data_url(url) {}
 
-  MP4IndexCreator indexer(video_bytes.size());
+  std::string data_url;
+};
 
-  uint64_t current_offset = 0;
-  uint64_t size_to_read = 1024;
-  while (!indexer.is_done()) {
-    indexer.feed(video_bytes.data() + current_offset, size_to_read,
-                 current_offset, size_to_read);
-    printf("offset to read %lu, size %lu\n", current_offset,
-           size_to_read);
-  }
-  assert(!indexer.is_error());
+const TestVideoInfo test_video("https://storage.googleapis.com/scanner-data/"
+                               "tutorial_assets/star_wars_heros.mp4");
+
+inline std::string download_video(const TestVideoInfo& info) {
+  std::string local_video_path;
+  temp_file(local_video_path);
+  download(info.data_url, local_video_path);
+  return local_video_path;
 }
 
 }

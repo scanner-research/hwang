@@ -24,6 +24,7 @@ struct GetBitsState {
 inline uint8_t get_bit(GetBitsState& gb) {
   uint8_t v =
       ((*(gb.buffer + (gb.offset >> 0x3))) >> (0x7 - (gb.offset & 0x7))) & 0x1;
+  //((*(gb.buffer + (gb.offset >> 0x3))) >> ((gb.offset & 0x7))) & 0x1;
   gb.offset++;
   return v;
 }
@@ -34,6 +35,13 @@ inline uint64_t get_bits(GetBitsState& gb, int32_t bits) {
     v |= (uint64_t)(get_bit(gb)) << i;
   }
   return v;
+}
+
+inline void align(GetBitsState& gb, int32_t alignment) {
+  int64_t diff = gb.offset % alignment;
+  if (diff != 0) {
+    gb.offset += alignment - diff;
+  }
 }
 
 inline uint64_t get_ue_golomb(GetBitsState& gb) {

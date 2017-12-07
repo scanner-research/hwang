@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
 project(Hwang)
 
 ###### Config options #####
-option(BUILD_CUDA "" ON)
+option(BUILD_CUDA "" OFF)
 option(BUILD_TESTS "" ON)
 
 if (BUILD_TESTS)
@@ -60,48 +60,50 @@ endif()
 ###### Optional Dependencies #######
 
 ###### Required Dependencies #######
-find_package(SaneProtobuf REQUIRED)
-find_package(FFmpeg REQUIRED)
-find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
-find_package(GFlags REQUIRED)
-find_package(Glog REQUIRED)
+#find_package(SaneProtobuf REQUIRED)
+#find_package(FFmpeg REQUIRED)
+#find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
+#find_package(GFlags REQUIRED)
+#find_package(Glog REQUIRED)
 find_package(GoogleTest REQUIRED)
-find_package(Storehouse REQUIRED CONFIG
-  PATHS "thirdparty/build/bin/storehouse")
+#find_package(Storehouse REQUIRED CONFIG
+#  PATHS "thirdparty/build/bin/storehouse")
 find_package(PythonLibs 2.7 EXACT REQUIRED)
 find_package(OpenMP REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 set(GTEST_INCLUDE_DIRS
-  "${THIRDPARTY_OUTPUT_PATH}/googletest/include")
+  "${GOOGLETEST_INCLUDE_DIRS}")
+
 set(GTEST_LIBRARIES
-  "${THIRDPARTY_OUTPUT_PATH}/googletest/lib/libgtest.a")
+  "${GOOGLETEST_LIBRARIES}")
+
 set(GTEST_LIB_MAIN
-  "${THIRDPARTY_OUTPUT_PATH}/googletest/lib/libgtest_main.a")
+  "${GOOGLETEST_INCLUDE_DIRS}/../lib/libgtest_main.a")
 
 message("${Boost_LIBRARIES}")
 set(HWANG_LIBRARIES
-  "${PROTOBUF_LIBRARY}"
-  "${FFMPEG_LIBRARIES}"
-  "-lswscale"
+  #"${PROTOBUF_LIBRARY}"
+  #"${FFMPEG_LIBRARIES}"
+  #"-lswscale"
   "${GFLAGS_LIBRARIES}"
   "${GLOG_LIBRARIES}"
   "-lpython2.7"
-  "${Boost_LIBRARIES}"
-  "${Boost_LIBRARY_DIRS}/libboost_python.so"
-  "${Boost_LIBRARY_DIRS}/libboost_numpy.so"
+  #"${Boost_LIBRARIES}"
+  #"${Boost_LIBRARY_DIRS}/libboost_python.so"
+  #"${Boost_LIBRARY_DIRS}/libboost_numpy.so"
   "${STOREHOUSE_LIBRARIES}")
 
 include_directories(
   "."
   "${CMAKE_CURRENT_BINARY_DIR}" # for protobuf generated files
-  "${PROTOBUF_INCLUDE_DIRS}"
-  "${FFMPEG_INCLUDE_DIR}"
-  "${STOREHOUSE_INCLUDE_DIRS}"
-  "${GLOG_INCLUDE_DIRS}"
-  "${PYTHON_INCLUDE_DIRS}"
-  "${Boost_INCLUDE_DIRS}")
+  #"${PROTOBUF_INCLUDE_DIRS}"
+  #"${FFMPEG_INCLUDE_DIR}"
+  #"${STOREHOUSE_INCLUDE_DIRS}"
+  #"${GLOG_INCLUDE_DIRS}"
+  "${PYTHON_INCLUDE_DIRS}")
+  #"${Boost_INCLUDE_DIRS}")
 
 if (BUILD_TESTS)
   include_directories("${GTEST_INCLUDE_DIRS}")
@@ -133,19 +135,19 @@ endif()
 ###### Project code #######
 set(PROTO_FILES)
 
-protobuf_generate_cpp(
-  PROTO_SRCS PROTO_HDRS OFF ${PROTO_FILES} ${GRPC_PROTO_FILES})
-protobuf_generate_cpp(
-  GRPC_PROTO_SRCS GRPC_PROTO_HDRS ON ${GRPC_PROTO_FILES})
+#protobuf_generate_cpp(
+#  PROTO_SRCS PROTO_HDRS OFF ${PROTO_FILES} ${GRPC_PROTO_FILES})
+#protobuf_generate_cpp(
+#  GRPC_PROTO_SRCS GRPC_PROTO_HDRS ON ${GRPC_PROTO_FILES})
 
-protobuf_generate_python(PROTO_PY OFF ${PROTO_FILES})
-protobuf_generate_python(GRPC_PROTO_PY ON ${GRPC_PROTO_FILES})
+#protobuf_generate_python(PROTO_PY OFF ${PROTO_FILES})
+#protobuf_generate_python(GRPC_PROTO_PY ON ${GRPC_PROTO_FILES})
 
-add_custom_target(proto_files DEPENDS
-  ${PROTO_HDRS} ${PROTO_PY} ${GRPC_PROTO_HDRS} ${GRPC_PROTO_PY})
+#add_custom_target(proto_files DEPENDS
+#  ${PROTO_HDRS} ${PROTO_PY} ${GRPC_PROTO_HDRS} ${GRPC_PROTO_PY})
 
 macro(add_deps)
-  add_dependencies(${targetName} proto_files)
+#   add_dependencies(${targetName} proto_files)
 endmacro()
 
 function(add_library targetName)
@@ -162,8 +164,9 @@ add_subdirectory(hwang)
 
 add_library(hwang SHARED
   $<TARGET_OBJECTS:hwang_source>
-  ${PROTO_SRCS}
-  ${GRPC_PROTO_SRCS})
+  #${PROTO_SRCS}
+  #${GRPC_PROTO_SRCS})
+  )
 
 if(APPLE)
   set(PLATFORM_LINK_FLAGS
@@ -185,13 +188,13 @@ target_link_libraries(hwang PUBLIC
 set(PYDIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # Make init files so python code can import from subdirectories
-foreach(FIL ${PROTO_FILES} ${GRPC_PROTO_FILES})
-  get_filename_component(DIR_FIL ${FIL} DIRECTORY)
-  get_filename_component(FIL_WE ${FIL} NAME_WE)
-  add_custom_command(TARGET proto_files POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E touch ${PYDIR}/${DIR_FIL}/__init__.py)
-endforeach()
+# foreach(FIL ${PROTO_FILES} ${GRPC_PROTO_FILES})
+#   get_filename_component(DIR_FIL ${FIL} DIRECTORY)
+#   get_filename_component(FIL_WE ${FIL} NAME_WE)
+#   add_custom_command(TARGET proto_files POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E touch ${PYDIR}/${DIR_FIL}/__init__.py)
+# endforeach()
 
 if (BUILD_TESTS)
-  add_subdirectory(tests)
+  #add_subdirectory(hwang/tests)
 endif()

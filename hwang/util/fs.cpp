@@ -1,4 +1,5 @@
-#include "scanner/util/util.h"
+//#include "hwang/util/util.h"
+#include "hwang/util/fs.h"
 
 #include <errno.h>
 #include <libgen.h>
@@ -10,7 +11,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace scanner {
+namespace hwang {
 // Stolen from
 // https://gist.github.com/JonathonReinhart/8c0d90191c38af2dcadb102c4e202950
 int mkdir_p(const char* path, mode_t mode) {
@@ -78,14 +79,14 @@ void download(const std::string& url, const std::string& local_path) {
   std::ostringstream strm;
   strm << "wget " << url << " -O " << local_path;
   int rc = std::system(strm.str().c_str());
-  LOG_IF(FATAL, !(WIFEXITED(rc) != 0 && WEXITSTATUS(rc) == 0))
-      << "wget failed for url " << url;
+  // LOG_IF(FATAL, !(WIFEXITED(rc) != 0 && WEXITSTATUS(rc) == 0))
+  //     << "wget failed for url " << url;
 }
 
 std::string download_temp(const std::string& url) {
   std::string local_video_path;
-  scanner::temp_file(local_video_path);
-  scanner::download(url, local_video_path);
+  temp_file(local_video_path);
+  download(url, local_video_path);
   return local_video_path;
 }
 

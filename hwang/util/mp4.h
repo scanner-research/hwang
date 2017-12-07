@@ -15,23 +15,27 @@
 
 #include "hwang/util/bits.h"
 
+#include <vector>
+#include <string>
+#include <cassert>
+
 namespace hwang {
 
 std::string type_to_string(uint32_t type) {
   std::string s;
-  uint8_t *p = &type;
+  uint8_t *p = reinterpret_cast<uint8_t*>(&type);
   for (int i = 0; i < 4; ++i) {
-    s += static_cast<char>(p[i]);
+    s += static_cast<char>(p[3 - i]);
   }
   return s;
 }
 
-uint32_t string_to_type(const std::string& type) {
+uint32_t string_to_type(const std::string& type_str) {
   uint32_t type;
-  uint8_t *p = &type;
-  assert(type.size() == 4);
+  uint8_t *p = reinterpret_cast<uint8_t*>(&type);
+  assert(type_str.size() == 4);
   for (int i = 0; i < 4; ++i) {
-    p[i] = type.data()[i];
+    p[i] = type_str.data()[3 - i];
   }
   return type;
 }
@@ -44,6 +48,8 @@ struct FullBox {
 };
 
 FullBox parse_box(GetBitsState& bs) {
+  align(bs, 8);
+
   FullBox b;
   b.size = get_bits(bs, 32);
   b.type = get_bits(bs, 32);
@@ -52,13 +58,16 @@ FullBox parse_box(GetBitsState& bs) {
   }
   if (b.type == string_to_type("uuid")) {
     // Skip 128 bits
-    bs.get_bits(64);
-    bs.get_bits(64);
+    get_bits(bs, 64);
+    get_bits(bs, 64);
   }
+  return b;
 }
 
 FullBox probe_box_type(GetBitsState& bs) {
-  i64 total_size = 0;
+  align(bs, 8);
+
+  int64_t total_size = 0;
 
   FullBox b;
   b.size = get_bits(bs, 32);
@@ -71,8 +80,8 @@ FullBox probe_box_type(GetBitsState& bs) {
   }
   if (b.type == string_to_type("uuid")) {
     // Skip 128 bits
-    bs.get_bits(64);
-    bs.get_bits(64);
+    get_bits(bs, 64);
+    get_bits(bs, 64);
     total_size += 16;
   }
   bs.offset -= total_size * 8;
@@ -81,27 +90,41 @@ FullBox probe_box_type(GetBitsState& bs) {
 }
 
 FullBox parse_full_box(GetBitsState& bs) {
+  align(bs, 8);
+
   FullBox b = parse_box(bs);
   b.version = (uint8_t)get_bits(bs, 8);
   b.flags = get_bits(bs, 24);
+
+  return b;
 }
 
 struct FileTypeBox : public FullBox {
   uint32_t major_brand;
-  uint32_t minor_brand;
+  uint32_t minor_version;
   std::vector<uint32_t> compatible_brands;
-}
+};
 
 FileTypeBox parse_ftyp(GetBitsState& bs) {
+  int64_t start = bs.offset / 8;
+
   FileTypeBox ftyp;
-  *((FullBox*)&ftyp) = bs.parse_full_box(bs);
+  *((FullBox*)&ftyp) = parse_box(bs);
+
   // Determine size left for compatible brands
   ftyp.major_brand = get_bits(bs, 32);
   ftyp.minor_version = get_bits(bs, 32);
-  int64_t num_brands = (ftyp.size - sizeof(FullBox) - 8) / 4;
+
+  int64_t size_left = (start + ftyp.size) - (bs.offset / 8);
+  printf("start %ld, size %ld, offset %ld", start, ftyp.size, bs.offset / 8);
+  printf("size left %ld\n", size_left);
+
+  int64_t num_brands = size_left / 4;
   for (int64_t i = 0; i < num_brands; ++i) {
     ftyp.compatible_brands.push_back(get_bits(bs, 32));
   }
+
+  return ftyp;
 }
 
 FullBox parse_moov(GetBitsState& bs) {
@@ -124,7 +147,7 @@ FullBox parse_mdia(GetBitsState& bs) {
 
 struct HandlerBox : public FullBox {
   uint32_t handler_type;
-}
+};
 
 HandlerBox parse_hdlr(GetBitsState& bs) {
   HandlerBox h;
@@ -132,12 +155,12 @@ HandlerBox parse_hdlr(GetBitsState& bs) {
   assert(h.type == string_to_type("hdlr"));
   assert(h.version == 0);
 
-  bs.get_bits(32); // pre_defined
-  h.handler_type = bs.get_bits(32); // handler_type
+  get_bits(bs, 32); // pre_defined
+  h.handler_type = get_bits(bs, 32); // handler_type
 
-  bs.get_bits(32);
-  bs.get_bits(32);
-  bs.get_bits(32);
+  get_bits(bs, 32);
+  get_bits(bs, 32);
+  get_bits(bs, 32);
 
   return h;
 }
@@ -151,17 +174,17 @@ FullBox parse_dinf(GetBitsState& bs) {
 struct DataEntryBox : public FullBox {
   std::string name;
   std::string location;
-}
+};
 
 struct DataReferenceBox : public FullBox {
   std::vector<DataEntryBox> data_entries;
-}
+};
 
 DataEntryBox parse_urn(GetBitsState& bs) {
   DataEntryBox e;
   *((FullBox*)&e) = parse_full_box(bs);
-  assert(r.type == string_to_type("urn "));
-  assert(r.version == 0);
+  assert(e.type == string_to_type("urn "));
+  assert(e.version == 0);
 
   if (e.flags == 0x00000001) {
     assert(false);
@@ -173,8 +196,8 @@ DataEntryBox parse_urn(GetBitsState& bs) {
 DataEntryBox parse_url(GetBitsState& bs) {
   DataEntryBox e;
   *((FullBox*)&e) = parse_full_box(bs);
-  assert(r.type == string_to_type("url "));
-  assert(r.version == 0);
+  assert(e.type == string_to_type("url "));
+  assert(e.version == 0);
 
   if (e.flags == 0x00000001) {
     return e;
@@ -274,7 +297,7 @@ SampleToChunkBox parse_stsc(GetBitsState& bs) {
     uint32_t sample_description_index = get_bits(bs, 32);
 
     if (prev_first_chunk != 0) {
-      ChunkEntry entry;
+      SampleToChunkBox::ChunkEntry entry;
       entry.num_samples = prev_samples_per_chunk;
       entry.sample_description_index = prev_sample_description_index;
       for (int j = 0; j < (first_chunk - prev_first_chunk); ++j) {
@@ -295,7 +318,7 @@ struct ChunkOffsetBox : public FullBox {
 };
 
 ChunkOffsetBox parse_stco(GetBitsState& bs) {
-  SampleToChunkBox sc;
+  ChunkOffsetBox sc;
   *((FullBox*)&sc) = parse_full_box(bs);
   assert(sc.type == string_to_type("stco"));
 
@@ -309,7 +332,7 @@ ChunkOffsetBox parse_stco(GetBitsState& bs) {
 }
 
 ChunkOffsetBox parse_co64(GetBitsState& bs) {
-  SampleToChunkBox sc;
+  ChunkOffsetBox sc;
   *((FullBox*)&sc) = parse_full_box(bs);
   assert(sc.type == string_to_type("co64"));
 
@@ -324,7 +347,7 @@ ChunkOffsetBox parse_co64(GetBitsState& bs) {
 
 struct SyncSampleBox : public FullBox {
   std::vector<uint32_t> sample_number;
-}
+};
 
 SyncSampleBox parse_stss(GetBitsState& bs) {
   SyncSampleBox ss;
@@ -337,7 +360,7 @@ SyncSampleBox parse_stss(GetBitsState& bs) {
     ss.sample_number.push_back(get_bits(bs, 32));
   }
 
-  return sc;
+  return ss;
 }
 
 }
