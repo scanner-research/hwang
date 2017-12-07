@@ -28,7 +28,7 @@ TEST(MP4IndexCreator, SimpleTest) {
   MP4IndexCreator indexer(video_bytes.size());
 
   uint64_t current_offset = 0;
-  uint64_t size_to_read = 1024;
+  uint64_t size_to_read = std::min((size_t)1024, video_bytes.size());
   while (!indexer.is_done()) {
     indexer.feed(video_bytes.data() + current_offset, size_to_read,
                  current_offset, size_to_read);

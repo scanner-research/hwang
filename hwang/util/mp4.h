@@ -64,27 +64,23 @@ FullBox parse_box(GetBitsState& bs) {
   return b;
 }
 
-FullBox probe_box_type(GetBitsState& bs) {
-  align(bs, 8);
+FullBox probe_box_type(const GetBitsState& bs) {
+  GetBitsState bs2 = bs;
 
-  int64_t total_size = 0;
+  align(bs2, 8);
 
   FullBox b;
-  b.size = get_bits(bs, 32);
-  b.type = get_bits(bs, 32);
-  total_size += 8;
+  b.size = get_bits(bs2, 32);
+  b.type = get_bits(bs2, 32);
 
   if (b.size == 1) {
-    b.size == get_bits(bs, 64);
-    total_size += 8;
+    b.size == get_bits(bs2, 64);
   }
   if (b.type == string_to_type("uuid")) {
     // Skip 128 bits
-    get_bits(bs, 64);
-    get_bits(bs, 64);
-    total_size += 16;
+    get_bits(bs2, 64);
+    get_bits(bs2, 64);
   }
-  bs.offset -= total_size * 8;
 
   return b;
 }
@@ -97,6 +93,14 @@ FullBox parse_full_box(GetBitsState& bs) {
   b.flags = get_bits(bs, 24);
 
   return b;
+}
+
+GetBitsState restrict_bits_to_box(const GetBitsState &bs) {
+  GetBitsState bs2 = bs;
+  FullBox b = probe_box_type(bs2);
+  GetBitsState new_bs = bs;
+  new_bs.size = new_bs.offset / 8 + b.size;
+  return new_bs;
 }
 
 struct FileTypeBox : public FullBox {
@@ -116,8 +120,6 @@ FileTypeBox parse_ftyp(GetBitsState& bs) {
   ftyp.minor_version = get_bits(bs, 32);
 
   int64_t size_left = (start + ftyp.size) - (bs.offset / 8);
-  printf("start %ld, size %ld, offset %ld", start, ftyp.size, bs.offset / 8);
-  printf("size left %ld\n", size_left);
 
   int64_t num_brands = size_left / 4;
   for (int64_t i = 0; i < num_brands; ++i) {

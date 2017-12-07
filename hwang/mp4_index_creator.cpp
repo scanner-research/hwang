@@ -58,7 +58,6 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
   // 14. Search for 'stss' Sync Sample Box for location of random access points.
   //     If missing, then all samples are randoma access points
 
-
   GetBitsState bs;
   bs.buffer = data;
   bs.offset = 0;
@@ -97,11 +96,46 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
   }                                                                            \
   return true;
 
-  while ((bs.offset / 8) < bs.size) {
+  auto search_for_box = [](GetBitsState& bs, uint32_t type,
+                           std::function<void(GetBitsState &)> fn) {
+    while ((bs.offset / 8) < bs.size) {
+      FullBox b = probe_box_type(bs);
+      printf("looking for %s, parsed box type: %s, parsed size: %ld, "
+             "offset: %ld, size: %ld\n",
+             type_to_string(type).c_str(),
+             type_to_string(b.type).c_str(),
+             b.size,
+             bs.offset / 8,
+             bs.size);
+      if (b.type == type) {
+        GetBitsState bs2 = bs;
+        fn(bs2);
+        bs.offset += b.size * 8;
+        return true;
+      } else {
+        // Skip ahead by the size
+        bs.offset += b.size * 8;
+      }
+    }
+    return false;
+  };
+
+  while ((bs.offset / 8) < bs.size && !done_) {
+    // Are we done?
+    if (parsed_ftyp_ && parsed_moov_) {
+      done_ = true;
+      return false;
+    }
+
     // Get type of next box
     FullBox b = probe_box_type(bs);
-    printf("parsed box type: %s, size: %ld\n", type_to_string(b.type).c_str(),
-           b.size);
+    printf("parsed box type: %s, size: %ld, bs off %ld, size %ld\n",
+           type_to_string(b.type).c_str(),
+           b.size,
+           bs.offset / 8,
+           bs.size
+           );
+    assert(b.size != 0);
     if (b.type == type("ftyp")) {
       if (size_left() < b.size) {
         // Get more data since we don't have this entire box
@@ -133,8 +167,70 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
         // Get more data since we don't have this entire box
         MORE_DATA(offset_, b.size);
       }
-      exit(0);
+      //  Search for 'trak' containers to find the video track
+      uint64_t before_moov_offset = bs.offset / 8;
+      GetBitsState moov_bs = restrict_bits_to_box(bs);
+      FullBox moov = parse_moov(moov_bs);
+      bool found_valid_trak = false;
+      uint64_t trak_offset = 0;
+      while ((moov_bs.offset / 8) < moov_bs.size) {
+        uint32_t trak_type = 0;
+        auto trak_verify_fn = [&](GetBitsState &bs) {
+          trak_offset = bs.offset;
+          GetBitsState trak_bs = restrict_bits_to_box(bs);
+          FullBox trak = parse_trak(trak_bs);
+          // Search for mdia trak
+          auto mdia_verify_fn = [&](GetBitsState &bs) {
+            GetBitsState mdia_bs = restrict_bits_to_box(bs);
+            FullBox mdia = parse_mdia(mdia_bs);
+            // Search for hdlr trak
+            auto hdlr_verify_fn = [&](GetBitsState &bs) {
+              HandlerBox hdlr = parse_hdlr(bs);
+              trak_type = hdlr.handler_type;
+            };
+            return search_for_box(mdia_bs, type("hdlr"), hdlr_verify_fn);
+          };
+          return search_for_box(trak_bs, type("mdia"), mdia_verify_fn);
+        };
+        bool found_trak = search_for_box(moov_bs, type("trak"), trak_verify_fn);
+        if (!found_trak) {
+          std::string error = "Could not find a trak box";
+          std::cerr << error << std::endl;
+          error_message_ = error;
+          error_ = true;
+          done_ = true;
+          return false;
+        }
 
+        if (trak_type == type("vide")) {
+          found_valid_trak = true;
+          break;
+        }
+      }
+      if (!found_valid_trak) {
+        std::string error = "Could not find a video trak file";
+        std::cerr << error << std::endl;
+        error_message_ = error;
+        error_ = true;
+        done_ = true;
+        return false;
+      }
+
+      // 11.  Search for 'stsz' or 'stz2' Sample Size Box to determine number
+      // and
+      //     size of samples.
+      // 12. Search for 'stsc' Sample To Chunk Box to determine which chunk a
+      // sample
+      //     is in.
+      // 13. Search for 'stco' or 'co64' Chunk Offset Box to determine the chunk
+      //     byte offsets in the file.
+      // 14. Search for 'stss' Sync Sample Box for location of random access
+      // points.
+      //     If missing, then all samples are randoma access points
+
+      printf("old offset %ld, before moov %ld\n", bs.offset, before_moov_offset);
+      bs.offset = (before_moov_offset + moov.size) * 8;
+      printf("new offset %ld\n", bs.offset);
       parsed_moov_ = true;
     } else {
       // If not a box we are interested in, skip to next box
@@ -146,10 +242,9 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
 
       MORE_DATA_LIMIT(offset_, 1024);
     }
+    offset_ += b.size;
   }
-  // Are we done?
-  if (parsed_ftyp_ && parsed_moov_) {
-    done_ = true;
+  if (done_) {
     return false;
   }
 
