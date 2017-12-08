@@ -20,7 +20,7 @@ namespace hwang {
 
 class VideoIndex {
  public:
-  VideoIndex();
+  VideoIndex() {};
 
   const std::vector<uint8_t>& metadata_bytes() { return metadata_bytes_; }
   const std::vector<int64_t> &keyframe_positions() {

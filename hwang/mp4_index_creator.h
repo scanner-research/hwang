@@ -14,6 +14,7 @@
 #pragma once
 
 #include "hwang/video_index.h"
+#include "hwang/util/mp4.h"
 
 #include <string>
 
@@ -35,7 +36,9 @@ class MP4IndexCreator {
 
   const VideoIndex& get_video_index();
 
-  bool is_done() { return done_; }
+  bool is_done() {
+    return done_ || (parsed_ftyp_ && parsed_moov_ && !fragments_present_);
+  }
 
   bool is_error() { return error_; }
 
@@ -52,6 +55,14 @@ class MP4IndexCreator {
   // Flags for if we have found all we need
   bool parsed_ftyp_ = false;
   bool parsed_moov_ = false;
+  bool fragments_present_ = false;
+
+  std::vector<TrackExtendsBox> track_extends_boxes_;
+
+  std::vector<uint64_t> sample_offsets_;
+  std::vector<uint64_t> sample_sizes_;
+  std::vector<uint64_t> keyframe_indices_;
 };
 
 }
+
