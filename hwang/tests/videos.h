@@ -23,8 +23,13 @@ struct TestVideoInfo {
   std::string data_url;
 };
 
-const TestVideoInfo test_video("https://storage.googleapis.com/scanner-data/"
-                               "tutorial_assets/star_wars_heros.mp4");
+const TestVideoInfo
+    test_video_fragmented("https://storage.googleapis.com/scanner-data/"
+                          "tutorial_assets/star_wars_heros.mp4");
+
+const TestVideoInfo
+    test_video_unfragmented("https://storage.googleapis.com/scanner-data/"
+                            "tutorial_assets/star_wars_heros_faces.mp4");
 
 inline std::string download_video(const TestVideoInfo& info) {
   std::string local_video_path;

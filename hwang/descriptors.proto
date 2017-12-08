@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package hwang.proto;
+
+message VideoIndex {
+ repeated uint64 sample_offsets = 2 [packed=true];
+ repeated uint64 sample_sizes = 3 [packed=true];
+ repeated uint64 keyframe_indices = 4 [packed=true];
+}

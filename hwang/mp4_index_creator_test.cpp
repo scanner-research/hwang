@@ -22,23 +22,24 @@
 namespace hwang {
 
 TEST(MP4IndexCreator, SimpleTest) {
-  // Download video file
-  std::vector<uint8_t> video_bytes =
-      //read_entire_file(download_video(test_video));
-  read_entire_file("/h/apoms/repos/scanner/2001_A_Space_Odyssey.mp4");
+  std::vector<TestVideoInfo> videos = {test_video_fragmented,
+                                       test_video_unfragmented};
 
-  MP4IndexCreator indexer(video_bytes.size());
+  for (const auto &video : videos) {
+    // Download video file
+    std::vector<uint8_t> video_bytes = read_entire_file(download_video(video));
 
-  uint64_t current_offset = 0;
-  uint64_t size_to_read = std::min((size_t)1024, video_bytes.size());
-  while (!indexer.is_done()) {
-    indexer.feed(video_bytes.data() + current_offset, size_to_read,
-                 current_offset, size_to_read);
-    printf("offset to read %lu, size %lu\n", current_offset,
-           size_to_read);
+    MP4IndexCreator indexer(video_bytes.size());
+
+    uint64_t current_offset = 0;
+    uint64_t size_to_read = std::min((size_t)1024, video_bytes.size());
+    while (!indexer.is_done()) {
+      indexer.feed(video_bytes.data() + current_offset, size_to_read,
+                   current_offset, size_to_read);
+    }
+    assert(!indexer.is_error());
+    indexer.get_video_index();
   }
-  assert(!indexer.is_error());
-  indexer.get_video_index();
 }
 
 }

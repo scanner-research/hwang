@@ -60,9 +60,9 @@ endif()
 ###### Optional Dependencies #######
 
 ###### Required Dependencies #######
-#find_package(SaneProtobuf REQUIRED)
+find_package(SaneProtobuf REQUIRED)
 #find_package(FFmpeg REQUIRED)
-#find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
+find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
 #find_package(GFlags REQUIRED)
 #find_package(Glog REQUIRED)
 find_package(GoogleTest REQUIRED)
@@ -84,26 +84,26 @@ set(GTEST_LIB_MAIN
 
 message("${Boost_LIBRARIES}")
 set(HWANG_LIBRARIES
-  #"${PROTOBUF_LIBRARY}"
+  "${PROTOBUF_LIBRARY}"
   #"${FFMPEG_LIBRARIES}"
   #"-lswscale"
   "${GFLAGS_LIBRARIES}"
   "${GLOG_LIBRARIES}"
   "-lpython2.7"
-  #"${Boost_LIBRARIES}"
-  #"${Boost_LIBRARY_DIRS}/libboost_python.so"
+  "${Boost_LIBRARIES}"
+  "${Boost_LIBRARY_DIRS}/libboost_python.so"
   #"${Boost_LIBRARY_DIRS}/libboost_numpy.so"
   "${STOREHOUSE_LIBRARIES}")
 
 include_directories(
   "."
   "${CMAKE_CURRENT_BINARY_DIR}" # for protobuf generated files
-  #"${PROTOBUF_INCLUDE_DIRS}"
+  "${PROTOBUF_INCLUDE_DIRS}"
   #"${FFMPEG_INCLUDE_DIR}"
   #"${STOREHOUSE_INCLUDE_DIRS}"
   #"${GLOG_INCLUDE_DIRS}"
-  "${PYTHON_INCLUDE_DIRS}")
-  #"${Boost_INCLUDE_DIRS}")
+  "${PYTHON_INCLUDE_DIRS}"
+  "${Boost_INCLUDE_DIRS}")
 
 if (BUILD_TESTS)
   include_directories("${GTEST_INCLUDE_DIRS}")
@@ -133,21 +133,19 @@ if (APPLE)
 endif()
 
 ###### Project code #######
-set(PROTO_FILES)
+set(PROTO_FILES
+  hwang/descriptors.proto)
 
-#protobuf_generate_cpp(
-#  PROTO_SRCS PROTO_HDRS OFF ${PROTO_FILES} ${GRPC_PROTO_FILES})
-#protobuf_generate_cpp(
-#  GRPC_PROTO_SRCS GRPC_PROTO_HDRS ON ${GRPC_PROTO_FILES})
+protobuf_generate_cpp(
+  PROTO_SRCS PROTO_HDRS OFF ${PROTO_FILES})
 
-#protobuf_generate_python(PROTO_PY OFF ${PROTO_FILES})
-#protobuf_generate_python(GRPC_PROTO_PY ON ${GRPC_PROTO_FILES})
+protobuf_generate_python(PROTO_PY OFF ${PROTO_FILES})
 
-#add_custom_target(proto_files DEPENDS
-#  ${PROTO_HDRS} ${PROTO_PY} ${GRPC_PROTO_HDRS} ${GRPC_PROTO_PY})
+add_custom_target(proto_files DEPENDS
+  ${PROTO_HDRS} ${PROTO_PY} )
 
 macro(add_deps)
-#   add_dependencies(${targetName} proto_files)
+   add_dependencies(${targetName} proto_files)
 endmacro()
 
 function(add_library targetName)
@@ -164,9 +162,7 @@ add_subdirectory(hwang)
 
 add_library(hwang SHARED
   $<TARGET_OBJECTS:hwang_source>
-  #${PROTO_SRCS}
-  #${GRPC_PROTO_SRCS})
-  )
+  ${PROTO_SRCS})
 
 if(APPLE)
   set(PLATFORM_LINK_FLAGS
@@ -183,7 +179,7 @@ endif()
 
 target_link_libraries(hwang PUBLIC
   ${HWANG_LIBRARIES}
-  "${PLATFORM_LINK_FLAGS}")
+  ${PLATFORM_LINK_FLAGS})
 
 set(PYDIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -194,7 +190,3 @@ set(PYDIR ${CMAKE_CURRENT_BINARY_DIR})
 #   add_custom_command(TARGET proto_files POST_BUILD
 #     COMMAND ${CMAKE_COMMAND} -E touch ${PYDIR}/${DIR_FIL}/__init__.py)
 # endforeach()
-
-if (BUILD_TESTS)
-  #add_subdirectory(hwang/tests)
-endif()

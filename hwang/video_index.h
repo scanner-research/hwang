@@ -22,27 +22,42 @@ class VideoIndex {
  public:
   VideoIndex() {};
 
-  const std::vector<uint8_t>& metadata_bytes() { return metadata_bytes_; }
-  const std::vector<int64_t> &keyframe_positions() {
-    return keyframe_positions_;
-  }
-  const std::vector<int64_t> &keyframe_timestamps() {
-    return keyframe_timestamps_;
-  }
-  const std::vector<int64_t> &keyframe_byte_offsets() {
-    return keyframe_byte_offsets_;
-  };
+  VideoIndex(uint64_t num_frames, const std::vector<uint8_t> &metadata,
+             const std::vector<uint64_t> &sample_offsets,
+             const std::vector<uint64_t> &sample_sizes,
+             const std::vector<uint64_t> &keyframe_indices)
+      : num_frames_(num_frames), metadata_bytes_(metadata),
+        sample_offsets_(sample_offsets),
+        sample_sizes_(sample_sizes),
+        keyframe_indices_(keyframe_indices) {};
 
-  int64_t frames() { return num_frames_; };
-  int64_t num_non_ref_frames() { return num_non_ref_frames_; };
+  static VideoIndex deserialize(const std::vector<uint8_t>& data);
+
+  std::vector<uint8_t> serialize();
+
+  const std::vector<uint8_t>& metadata_bytes() { return metadata_bytes_; }
+
+  const std::vector<uint64_t> &sample_offsets() {
+    return sample_sizes_;
+  }
+  const std::vector<uint64_t> &sample_sizes() {
+    return sample_offsets_;
+  };
+  const std::vector<uint64_t> &keyframe_indices() {
+    return keyframe_indices_;
+  }
+
+  uint64_t frames() { return num_frames_; };
+  uint64_t num_non_ref_frames() { return num_non_ref_frames_; };
 
 private:
-  int64_t num_frames_;
-  int64_t num_non_ref_frames_ = 0;
+  uint64_t num_frames_;
+  uint64_t num_non_ref_frames_ = 0;
   std::vector<uint8_t> metadata_bytes_;
-  std::vector<int64_t> keyframe_positions_;
-  std::vector<int64_t> keyframe_timestamps_;
-  std::vector<int64_t> keyframe_byte_offsets_;
+
+  std::vector<uint64_t> sample_offsets_;
+  std::vector<uint64_t> sample_sizes_;
+  std::vector<uint64_t> keyframe_indices_;
 };
 
 }

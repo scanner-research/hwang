@@ -664,12 +664,8 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
 
 
 VideoIndex MP4IndexCreator::get_video_index() {
-  printf("total samples %lu\n", sample_sizes_.size());
-  for (size_t i = 0; i < keyframe_indices_.size(); ++i) {
-    printf("keyframe %ld\n", keyframe_indices_[i]);
-  }
-
-  return VideoIndex();
+  return VideoIndex(sample_sizes_.size(), {}, sample_offsets_, sample_sizes_,
+                    keyframe_indices_);
 }
 
 } // namespace hwang

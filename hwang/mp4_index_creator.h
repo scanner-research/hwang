@@ -65,4 +65,3 @@ class MP4IndexCreator {
 };
 
 }
-
