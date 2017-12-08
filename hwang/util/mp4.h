@@ -446,7 +446,7 @@ struct SyncSampleBox : public FullBox {
 inline SyncSampleBox parse_stss(GetBitsState& bs) {
   SyncSampleBox ss;
   *((FullBox*)&ss) = parse_full_box(bs);
-  assert(ss.type == string_to_type("co64"));
+  assert(ss.type == string_to_type("stss"));
 
   uint32_t entry_count = get_bits(bs, 32);
 

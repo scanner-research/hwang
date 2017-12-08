@@ -34,7 +34,7 @@ class MP4IndexCreator {
             uint64_t& next_offset,
             uint64_t& next_size);
 
-  const VideoIndex& get_video_index();
+  VideoIndex get_video_index();
 
   bool is_done() {
     return done_ || (parsed_ftyp_ && parsed_moov_ && !fragments_present_);

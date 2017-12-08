@@ -377,10 +377,27 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
                   // access points. If missing, then all samples are randoma
                   // access points
                   std::vector<uint64_t> keyframe_indices;
+                  {
+                    GetBitsState bs = stbl_bs;
+                    bool found_stss =
+                        search_for_box(bs, type("stss"), [&](GetBitsState &bs) {
+                          SyncSampleBox stss = parse_stss(bs);
+                          for (size_t i = 0; i < stss.sample_number.size();
+                               ++i) {
+                            keyframe_indices.push_back(stss.sample_number[i]);
+                          }
+                          return true;
+                        });
 
-                  for (size_t i = 0; sample_sizes.size(); ++i) {
+                    if (!found_stss) {
+                      for (size_t i = 0; i < sample_sizes.size(); ++i) {
+                        keyframe_indices.push_back(sample_offsets_.size() + i);
+                      }
+                    }
+                  }
+
+                  for (size_t i = 0; i < sample_sizes.size(); ++i) {
                     sample_offsets_.push_back(sample_offsets[i]);
-                    sample_sizes_.push_back(sample_sizes[i]);
                     sample_sizes_.push_back(sample_sizes[i]);
                   }
                   for (uint64_t ki : keyframe_indices) {
@@ -646,7 +663,7 @@ bool MP4IndexCreator::feed(uint8_t* data, size_t size,
 }
 
 
-const VideoIndex& MP4IndexCreator::get_video_index() {
+VideoIndex MP4IndexCreator::get_video_index() {
   printf("total samples %lu\n", sample_sizes_.size());
   for (size_t i = 0; i < keyframe_indices_.size(); ++i) {
     printf("keyframe %ld\n", keyframe_indices_[i]);
