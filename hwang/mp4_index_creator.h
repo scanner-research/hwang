@@ -30,7 +30,7 @@ class MP4IndexCreator {
   // @param[out] next_offset The next offset in the file to read from
   // @param[out] next_offset The next size of data to read from the file
   // @return False if done or there was an error
-  bool feed(uint8_t* data, size_t size,
+  bool feed(const uint8_t* data, size_t size,
             uint64_t& next_offset,
             uint64_t& next_size);
 

@@ -26,7 +26,7 @@ MP4IndexCreator::MP4IndexCreator(uint64_t file_size)
     : file_size_(file_size), done_(false), error_(false) {
 }
 
-bool MP4IndexCreator::feed(uint8_t* data, size_t size,
+bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                            uint64_t& next_offset,
                            uint64_t& next_size) {
   // 1.  Search for 'ftype' container to ensure this is a proper mp4 file
