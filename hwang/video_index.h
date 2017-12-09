@@ -33,22 +33,24 @@ class VideoIndex {
 
   static VideoIndex deserialize(const std::vector<uint8_t>& data);
 
-  std::vector<uint8_t> serialize();
+  std::vector<uint8_t> serialize() const;
 
-  const std::vector<uint8_t>& metadata_bytes() { return metadata_bytes_; }
+  const std::vector<uint8_t>& metadata_bytes() const { return metadata_bytes_; }
 
-  const std::vector<uint64_t> &sample_offsets() {
+  const std::vector<uint64_t> &sample_sizes() const {
     return sample_sizes_;
   }
-  const std::vector<uint64_t> &sample_sizes() {
+
+  const std::vector<uint64_t> &sample_offsets() const {
     return sample_offsets_;
-  };
-  const std::vector<uint64_t> &keyframe_indices() {
+  }
+
+  const std::vector<uint64_t> &keyframe_indices() const {
     return keyframe_indices_;
   }
 
-  uint64_t frames() { return num_frames_; };
-  uint64_t num_non_ref_frames() { return num_non_ref_frames_; };
+  uint64_t frames() const { return num_frames_; };
+  uint64_t num_non_ref_frames() const { return num_non_ref_frames_; };
 
 private:
   uint64_t num_frames_;
@@ -60,4 +62,11 @@ private:
   std::vector<uint64_t> keyframe_indices_;
 };
 
+struct VideoIntervals {
+  std::vector<std::tuple<size_t, size_t>> sample_index_intervals;
+  std::vector<std::vector<uint64_t>> valid_frames;
+};
+
+VideoIntervals slice_into_video_intervals(const VideoIndex &index,
+                                          const std::vector<uint64_t> &rows);
 }

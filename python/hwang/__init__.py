@@ -1,15 +1,7 @@
-from .libhwang import *
+from video_index import *
+from decoder import *
 import os
 
-@staticmethod
-def __VideoIndex_from_file(f):
-    return VideoIndex.deserialize(f.read())
-
-def __VideoIndex_to_file(self, f):
-    f.write(self.serialize())
-
-setattr(VideoIndex, 'from_file', __VideoIndex_from_file)
-setattr(VideoIndex, 'to_file', __VideoIndex_to_file)
 
 def index_video(f_or_string, size=None):
     def w(f, size):
