@@ -19,6 +19,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <cstring>
 
 namespace hwang {
 
@@ -47,7 +48,6 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   //      of frames
   // End note.
 
-  // TODO(apoms): Make sure the data is in h264 format by parsing stsd
 
   // 11.  Search for 'stsz' or 'stz2' Sample Size Box to determine number and
   //     size of samples.
@@ -57,8 +57,11 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   //     byte offsets in the file.
   // 14. Search for 'stss' Sync Sample Box for location of random access points.
   //     If missing, then all samples are randoma access points
+
+  // TODO(apoms): Make sure the data is in h264 format by parsing stsd
+  // 16.  Search for 'stsd' to get avc metadata
   //
-  // 15. If 'mvex' was specified, then search for all 'moofs'
+  // 17. If 'mvex' was specified, then search for all 'moofs'
 
   GetBitsState bs;
   bs.buffer = data;
@@ -396,6 +399,57 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                     }
                   }
 
+                  int16_t width;
+                  int16_t height;
+                  std::vector<uint8_t> extradata;
+                  {
+                    GetBitsState bs = stbl_bs;
+                    bool found_stsd =
+                        search_for_box(bs, type("stsd"), [&](GetBitsState &bs) {
+                          GetBitsState stsd_bs = restrict_bits_to_box(bs);
+                          SampleDescriptionBox stsd = parse_stsd(stsd_bs);
+                          printf("sample count %d\n", stsd.entry_count);
+                          for (size_t i = 0; i < stsd.entry_count; ++i) {
+                            GetBitsState vs_bs = restrict_bits_to_box(stsd_bs);
+                            VisualSampleEntry vs =
+                                parse_visual_sample_entry(vs_bs);
+                            width = vs.width;
+                            height = vs.height;
+                            printf("vs bs offset %lu, stsdbs siez %lu, type %s\n",
+                                   vs_bs.offset / 8,
+                                   stsd_bs.offset / 8 + vs.size,
+                                   type_to_string(vs.type).c_str());
+                            if (vs_bs.offset / 8 <
+                                stsd_bs.offset / 8 + vs.size &&
+                                vs.type == string_to_type("avc1")) {
+                              GetBitsState vs_bs2 = vs_bs;
+                              FullBox b2 = parse_box(vs_bs2);
+                              printf("b2 type %s\n", type_to_string(b2.type).c_str());
+                              if (b2.type == string_to_type("avcC")) {
+                                size_t size = b2.size;
+                                extradata.resize(size);
+                                memcpy(extradata.data(),
+                                       vs_bs.buffer, size);
+                              }
+                            }
+                            stsd_bs.offset += vs.size * 8;
+                          }
+                          return true;
+                        });
+
+                    if (!found_stsd) {
+                      std::string error = "Could not find 'stsd'";
+                      std::cerr << error << std::endl;
+                      error_message_ = error;
+                      error_ = true;
+                      done_ = true;
+                      return false;
+                    }
+                  }
+
+                  width_ = width;
+                  height_ = height;
+
                   for (size_t i = 0; i < sample_sizes.size(); ++i) {
                     sample_offsets_.push_back(sample_offsets[i]);
                     sample_sizes_.push_back(sample_sizes[i]);
@@ -403,6 +457,8 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                   for (uint64_t ki : keyframe_indices) {
                     keyframe_indices_.push_back(ki);
                   }
+
+                  extradata_ = extradata;
 
                   return true;
                 });
@@ -664,8 +720,8 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
 
 VideoIndex MP4IndexCreator::get_video_index() {
-  return VideoIndex(sample_sizes_.size(), {}, sample_offsets_, sample_sizes_,
-                    keyframe_indices_);
+  return VideoIndex(width_, height_, sample_offsets_,
+                    sample_sizes_, keyframe_indices_, extradata_);
 }
 
 } // namespace hwang

@@ -15,12 +15,14 @@
 
 #pragma once
 
-#include "hwang/video_decoder.h"
+#include "hwang/video_decoder_interface.h"
+#include "hwang/video_decoder_factory.h"
 
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <atomic>
 
 namespace hwang {
 
@@ -30,57 +32,70 @@ class DecoderAutomata {
   DecoderAutomata(const DecoderAutomata&& other) = delete;
 
  public:
-  DecoderAutomata(DeviceHandle device_handle, i32 num_devices,
+  DecoderAutomata(DeviceHandle device_handle, int32_t num_devices,
                   VideoDecoderType decoder_type);
   ~DecoderAutomata();
 
-  void initialize(const std::vector<proto::DecodeArgs>& encoded_data);
+  struct EncodedData {
+    std::vector<uint8_t> encoded_video;
+    uint32_t width;
+    uint32_t height;
+    uint64_t start_keyframe;
+    uint64_t end_keyframe;
+    std::vector<uint64_t> sample_offsets;
+    std::vector<uint64_t> sample_sizes;
+    std::vector<uint64_t> keyframes;
+    std::vector<uint64_t> valid_frames;
+  };
+  void initialize(const std::vector<EncodedData> &encoded_data,
+                  const std::vector<uint8_t> &extradata);
 
-  void get_frames(u8* buffer, i32 num_frames);
+  void get_frames(uint8_t* buffer, int32_t num_frames);
 
-  void set_profiler(Profiler* profiler);
+  // void set_profiler(Profiler* profiler);
 
  private:
   void feeder();
 
-  void set_feeder_idx(i32 data_idx);
+  void set_feeder_idx(int32_t data_idx);
 
-  const i32 MAX_BUFFERED_FRAMES = 8;
+  const int32_t MAX_BUFFERED_FRAMES = 8;
 
-  Profiler* profiler_ = nullptr;
+  // Profiler* profiler_ = nullptr;
 
   DeviceHandle device_handle_;
-  i32 num_devices_;
+  int32_t num_devices_;
   VideoDecoderType decoder_type_;
-  std::unique_ptr<VideoDecoder> decoder_;
+  std::unique_ptr<VideoDecoderInterface> decoder_;
   std::atomic<bool> feeder_waiting_;
   std::thread feeder_thread_;
   std::atomic<bool> not_done_;
 
-  FrameInfo info_{};
+  VideoDecoderInterface::FrameInfo info_{};
   size_t frame_size_;
-  i32 current_frame_;
-  std::atomic<i32> reset_current_frame_;
-  std::vector<proto::DecodeArgs> encoded_data_;
+  int32_t current_frame_;
+  std::atomic<int32_t> reset_current_frame_;
+  std::vector<EncodedData> encoded_data_;
 
-  std::atomic<i64> next_frame_;
-  std::atomic<i64> frames_retrieved_;
-  std::atomic<i64> frames_to_get_;
+  std::atomic<int64_t> next_frame_;
+  std::atomic<int64_t> frames_retrieved_;
+  std::atomic<int64_t> frames_to_get_;
 
-  std::atomic<i32> retriever_data_idx_;
-  std::atomic<i32> retriever_valid_idx_;
+  std::atomic<int32_t> retriever_data_idx_;
+  std::atomic<int32_t> retriever_valid_idx_;
 
   std::atomic<bool> skip_frames_;
   std::atomic<bool> seeking_;
-  std::atomic<i32> feeder_data_idx_;
-  std::atomic<i64> feeder_valid_idx_;
-  std::atomic<i64> feeder_current_frame_;
-  std::atomic<i64> feeder_next_frame_;
+  std::atomic<int32_t> feeder_data_idx_;
+  std::atomic<int64_t> feeder_valid_idx_;
+  std::atomic<int64_t> feeder_current_frame_;
+  std::atomic<int64_t> feeder_next_frame_;
 
   std::atomic<size_t> feeder_buffer_offset_;
-  std::atomic<i64> feeder_next_keyframe_;
+  std::atomic<int64_t> feeder_next_keyframe_;
+  std::atomic<int64_t> feeder_next_keyframe_idx_;
   std::mutex feeder_mutex_;
   std::condition_variable wake_feeder_;
 };
-}
+
 }

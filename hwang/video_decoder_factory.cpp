@@ -1,6 +1,4 @@
-/* Copyright 2016 Carnegie Mellon University
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
+/* Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -13,25 +11,24 @@
  * limitations under the License.
  */
 
-#include "scanner/video/video_decoder.h"
+#include "hwang/video_decoder_factory.h"
 
 #ifdef HAVE_NVIDIA_VIDEO_HARDWARE
 #include "scanner/util/cuda.h"
-#include "scanner/video/nvidia/nvidia_video_decoder.h"
+#include "hwang/impls/nvidia/nvidia_video_decoder.h"
 #endif
 
 #ifdef HAVE_INTEL_VIDEO_HARDWARE
-#include "scanner/video/intel/intel_video_decoder.h"
+#include "hwang/impls/intel/intel_video_decoder.h"
 #endif
 
-#include "scanner/video/software/software_video_decoder.h"
+#include "hwang/impls/software/software_video_decoder.h"
 
 #include <cassert>
 
-namespace scanner {
-namespace internal {
+namespace hwang {
 
-std::vector<VideoDecoderType> VideoDecoder::get_supported_decoder_types() {
+std::vector<VideoDecoderType> VideoDecoderFactory::get_supported_decoder_types() {
   std::vector<VideoDecoderType> decoder_types;
 #ifdef HAVE_NVIDIA_VIDEO_HARDWARE
   decoder_types.push_back(VideoDecoderType::NVIDIA);
@@ -44,9 +41,9 @@ std::vector<VideoDecoderType> VideoDecoder::get_supported_decoder_types() {
   return decoder_types;
 }
 
-bool VideoDecoder::has_decoder_type(VideoDecoderType type) {
+bool VideoDecoderFactory::has_decoder_type(VideoDecoderType type) {
   std::vector<VideoDecoderType> types =
-      VideoDecoder::get_supported_decoder_types();
+      VideoDecoderFactory::get_supported_decoder_types();
 
   for (const VideoDecoderType& supported_type : types) {
     if (type == supported_type) return true;
@@ -55,10 +52,9 @@ bool VideoDecoder::has_decoder_type(VideoDecoderType type) {
   return false;
 }
 
-VideoDecoder* VideoDecoder::make_from_config(DeviceHandle device_handle,
-                                             i32 num_devices,
-                                             VideoDecoderType type) {
-  VideoDecoder* decoder = nullptr;
+VideoDecoderInterface *VideoDecoderFactory::make_from_config(
+    DeviceHandle device_handle, uint32_t num_devices, VideoDecoderType type) {
+  VideoDecoderInterface *decoder = nullptr;
 
   switch (type) {
     case VideoDecoderType::NVIDIA: {
@@ -101,6 +97,4 @@ VideoDecoder* VideoDecoder::make_from_config(DeviceHandle device_handle,
   return decoder;
 }
 
-void VideoDecoder::set_profiler(Profiler* profiler) { profiler_ = profiler; }
-}
 }

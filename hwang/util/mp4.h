@@ -311,6 +311,72 @@ inline FullBox parse_stbl(GetBitsState& bs) {
   return b;
 }
 
+struct SampleDescriptionBox : public FullBox {
+  uint32_t entry_count;
+};
+
+inline SampleDescriptionBox parse_stsd(GetBitsState& bs) {
+  SampleDescriptionBox sd;
+  *((FullBox*)&sd) = parse_full_box(bs);
+  assert(sd.type == string_to_type("stsd"));
+
+  sd.entry_count = get_bits(bs, 32);
+
+  return sd;
+}
+
+struct SampleEntry : public FullBox {
+  uint16_t data_reference_index;
+};
+
+inline SampleEntry parse_sample_entry(GetBitsState& bs) {
+  SampleEntry entry;
+  *((FullBox*)&entry) = parse_box(bs);
+
+  for (int i = 0; i < 6; ++i) {
+    get_bits(bs, 8);
+  }
+
+  entry.data_reference_index = get_bits(bs, 16);
+
+  return entry;
+}
+
+struct VisualSampleEntry : public SampleEntry {
+  uint16_t width;
+  uint16_t height;
+  std::string codec_name;
+};
+
+inline VisualSampleEntry parse_visual_sample_entry(GetBitsState& bs) {
+  VisualSampleEntry entry;
+  *((SampleEntry*)&entry) = parse_sample_entry(bs);
+
+  get_bits(bs, 16);
+  get_bits(bs, 16);
+  get_bits(bs, 32);
+  get_bits(bs, 32);
+  get_bits(bs, 32);
+
+  entry.width = get_bits(bs, 16);
+  entry.height = get_bits(bs, 16);
+
+  get_bits(bs, 32); // horiz resolution
+  get_bits(bs, 32); // vert resolution
+  get_bits(bs, 32); // data size
+  get_bits(bs, 16); // frames per sample
+
+  int32_t codec_name_len = get_bits(bs, 8); // codec name len
+  for (int i = 0; i < 31; ++i) {
+    get_bits(bs, 8);
+  }
+
+  get_bits(bs, 16); // depth
+  get_bits(bs, 16);
+
+  return entry;
+}
+
 struct SampleSizeBox : public FullBox {
   uint32_t sample_size;
   uint32_t sample_count;

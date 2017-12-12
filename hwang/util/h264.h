@@ -17,10 +17,13 @@
 
 #include "hwang/util/bits.h"
 
+#include <vector>
+#include <map>
+
 namespace hwang {
 
-inline void next_nal(const u8*& buffer, i32& buffer_size_left,
-                     const u8*& nal_start, i32& nal_size) {
+inline void next_nal(const uint8_t*& buffer, int32_t& buffer_size_left,
+                     const uint8_t*& nal_start, int32_t& nal_size) {
   bool found = false;
   while (buffer_size_left > 2) {
     if (buffer[0] == 0x00 && buffer[1] == 0x00 && buffer[2] == 0x01) {
@@ -55,24 +58,24 @@ inline void next_nal(const u8*& buffer, i32& buffer_size_left,
   }
 }
 
-inline i32 get_nal_unit_type(const u8* nal_start) {
+inline int32_t get_nal_unit_type(const uint8_t* nal_start) {
   return (*nal_start) & 0x1F;
 }
 
-inline i32 get_nal_ref_idc(const u8* nal_start) { return (*nal_start >> 5); }
+inline int32_t get_nal_ref_idc(const uint8_t* nal_start) { return (*nal_start >> 5); }
 
-inline bool is_vcl_nal(i32 nal_type) { return nal_type >= 1 && nal_type <= 5; }
+inline bool is_vcl_nal(int32_t nal_type) { return nal_type >= 1 && nal_type <= 5; }
 
-inline bool is_first_vcl_nal(i32 nal_type) {
+inline bool is_first_vcl_nal(int32_t nal_type) {
   return nal_type >= 1 && nal_type <= 5;
 }
 
 struct SPS {
-  i32 profile_idc;
-  u32 sps_id;
-  u32 log2_max_frame_num;
-  u32 poc_type;
-  u32 log2_max_pic_order_cnt_lsb;
+  int32_t profile_idc;
+  uint32_t sps_id;
+  uint32_t log2_max_frame_num;
+  uint32_t poc_type;
+  uint32_t log2_max_pic_order_cnt_lsb;
   bool delta_pic_order_always_zero_flag;
   bool frame_mbs_only_flag;
 };
@@ -105,7 +108,7 @@ inline bool parse_sps(GetBitsState& gb, SPS& info) {
       info.profile_idc == 139 || info.profile_idc == 134 ||
       info.profile_idc == 135 || info.profile_idc == 144) {
     // chroma_format_idc
-    u32 chroma_format_idc = get_ue_golomb(gb);
+    uint32_t chroma_format_idc = get_ue_golomb(gb);
     if (chroma_format_idc > 3U) {
       LOG(WARNING) << "invalid chroma format idc " << chroma_format_idc;
       return false;
@@ -118,8 +121,8 @@ inline bool parse_sps(GetBitsState& gb, SPS& info) {
       }
     }
     // bit_depth_luma
-    u32 bit_depth_luma = get_ue_golomb(gb) + 8;
-    u32 bit_depth_chroma = get_ue_golomb(gb) + 8;
+    uint32_t bit_depth_luma = get_ue_golomb(gb) + 8;
+    uint32_t bit_depth_chroma = get_ue_golomb(gb) + 8;
     if (bit_depth_chroma != bit_depth_luma) {
       LOG(WARNING) << "separate color planes not supported";
       return false;
@@ -138,7 +141,7 @@ inline bool parse_sps(GetBitsState& gb, SPS& info) {
       return false;
     }
   }
-  VLOG(1) << "profile idc " << (i32)info.profile_idc;
+  VLOG(1) << "profile idc " << (int32_t)info.profile_idc;
   // log2_max_frame_num_minus4
   info.log2_max_frame_num = get_ue_golomb(gb) + 4;
   // pic_order_cnt_type
@@ -156,8 +159,8 @@ inline bool parse_sps(GetBitsState& gb, SPS& info) {
       // offset_for_top_to_bottom_field
       get_se_golomb(gb);
       // num_ref_frames_in_pic_order_cnt_cycle
-      u32 num_ref_frames = get_ue_golomb(gb);
-      for (u32 i = 0; i < num_ref_frames; i++) {
+      uint32_t num_ref_frames = get_ue_golomb(gb);
+      for (uint32_t i = 0; i < num_ref_frames; i++) {
         // offset_for_ref_frame[ i ];
         get_se_golomb(gb);
       }
@@ -185,14 +188,14 @@ inline bool parse_sps(GetBitsState& gb, SPS& info) {
 }
 
 struct PPS {
-  u32 pps_id;
-  u32 sps_id;
+  uint32_t pps_id;
+  uint32_t sps_id;
   bool pic_order_present_flag;
   bool redundant_pic_cnt_present_flag;
-  u32 num_ref_idx_l0_default_active;
-  u32 num_ref_idx_l1_default_active;
+  uint32_t num_ref_idx_l0_default_active;
+  uint32_t num_ref_idx_l1_default_active;
   bool weighted_pred_flag;
-  u8 weighted_bipred_idc;
+  uint8_t weighted_bipred_idc;
 };
 
 inline bool parse_pps(GetBitsState& gb, PPS& info) {
@@ -205,10 +208,10 @@ inline bool parse_pps(GetBitsState& gb, PPS& info) {
   // pic_order_present_flag
   info.pic_order_present_flag = get_bit(gb);
   // num_slice_groups_minus1
-  u32 num_slice_groups_minus1 = get_ue_golomb(gb);
+  uint32_t num_slice_groups_minus1 = get_ue_golomb(gb);
   if (num_slice_groups_minus1 > 0) {
     // slice_group_map_type
-    u32 slice_group_map_type = get_ue_golomb(gb);
+    uint32_t slice_group_map_type = get_ue_golomb(gb);
     // FMO not supported
     LOG(WARNING) << "FMO encoded video not supported";
     return false;
@@ -222,11 +225,11 @@ inline bool parse_pps(GetBitsState& gb, PPS& info) {
   // weighted_bipred_idc
   info.weighted_bipred_idc = get_bits(gb, 2);
   // pic_init_qp_minus26 /* relative to 26 */
-  u32 pic_init_qp_minus26 = get_se_golomb(gb);
+  uint32_t pic_init_qp_minus26 = get_se_golomb(gb);
   // pic_init_qs_minus26 /* relative to 26 */
-  u32 pic_init_qs_minus26 = get_se_golomb(gb);
+  uint32_t pic_init_qs_minus26 = get_se_golomb(gb);
   // chroma_qp_index_offset
-  u32 chroma_qp_index_offset = get_se_golomb(gb);
+  uint32_t chroma_qp_index_offset = get_se_golomb(gb);
   // deblocking_filter_control_present_flag
   (void)get_bit(gb);
   // constrained_intra_pred_flag
@@ -239,26 +242,26 @@ inline bool parse_pps(GetBitsState& gb, PPS& info) {
 }
 
 struct SliceHeader {
-  u32 nal_unit_type;
-  u32 nal_ref_idc;
-  u32 slice_type;
-  u32 sps_id;  // Added for convenience
-  u32 pps_id;
-  u32 frame_num;
+  uint32_t nal_unit_type;
+  uint32_t nal_ref_idc;
+  uint32_t slice_type;
+  uint32_t sps_id;  // Added for convenience
+  uint32_t pps_id;
+  uint32_t frame_num;
   bool field_pic_flag;
   bool bottom_field_flag;
-  u32 idr_pic_id;
-  u32 pic_order_cnt_lsb;
-  i32 delta_pic_order_cnt_bottom;
-  u32 delta_pic_order_cnt[2];
-  u32 redundant_pic_cnt;
-  u32 num_ref_idx_l0_active;
-  u32 num_ref_idx_l1_active;
+  uint32_t idr_pic_id;
+  uint32_t pic_order_cnt_lsb;
+  int32_t delta_pic_order_cnt_bottom;
+  uint32_t delta_pic_order_cnt[2];
+  uint32_t redundant_pic_cnt;
+  uint32_t num_ref_idx_l0_active;
+  uint32_t num_ref_idx_l1_active;
 };
 
 inline bool parse_slice_header(GetBitsState& gb, SPS& sps,
-                               std::map<u32, PPS>& pps_map, u32 nal_unit_type,
-                               u32 nal_ref_idc, SliceHeader& info) {
+                               std::map<uint32_t, PPS>& pps_map, uint32_t nal_unit_type,
+                               uint32_t nal_ref_idc, SliceHeader& info) {
   info.nal_unit_type = nal_unit_type;
   info.nal_ref_idc = nal_ref_idc;
   // first_mb_in_slice
@@ -334,8 +337,8 @@ inline bool parse_slice_header(GetBitsState& gb, SPS& sps,
   return true;
 }
 
-inline bool is_new_access_unit(std::map<u32, SPS>& sps_map,
-                               std::map<u32, PPS>& pps_map, SliceHeader& prev,
+inline bool is_new_access_unit(std::map<uint32_t, SPS>& sps_map,
+                               std::map<uint32_t, PPS>& pps_map, SliceHeader& prev,
                                SliceHeader& curr) {
   SPS& prev_sps = sps_map.at(prev.sps_id);
   SPS& curr_sps = sps_map.at(curr.sps_id);

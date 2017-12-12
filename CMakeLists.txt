@@ -61,13 +61,11 @@ endif()
 
 ###### Required Dependencies #######
 find_package(SaneProtobuf REQUIRED)
-#find_package(FFmpeg REQUIRED)
+find_package(FFmpeg REQUIRED)
 find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
-#find_package(GFlags REQUIRED)
-#find_package(Glog REQUIRED)
+find_package(GFlags REQUIRED)
+find_package(Glog REQUIRED)
 find_package(GoogleTest REQUIRED)
-#find_package(Storehouse REQUIRED CONFIG
-#  PATHS "thirdparty/build/bin/storehouse")
 find_package(PythonLibs 2.7 EXACT REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -85,23 +83,21 @@ set(GTEST_LIB_MAIN
 message("${Boost_LIBRARIES}")
 set(HWANG_LIBRARIES
   "${PROTOBUF_LIBRARY}"
-  #"${FFMPEG_LIBRARIES}"
-  #"-lswscale"
+  "${FFMPEG_LIBRARIES}"
+  "${FFMPEG_LIBRARIES}"
   "${GFLAGS_LIBRARIES}"
   "${GLOG_LIBRARIES}"
   "-lpython2.7"
   "${Boost_LIBRARIES}"
   "${Boost_LIBRARY_DIRS}/libboost_python.so"
-  #"${Boost_LIBRARY_DIRS}/libboost_numpy.so"
-  "${STOREHOUSE_LIBRARIES}")
+  "${Boost_LIBRARY_DIRS}/libboost_numpy.so")
 
 include_directories(
   "."
   "${CMAKE_CURRENT_BINARY_DIR}" # for protobuf generated files
   "${PROTOBUF_INCLUDE_DIRS}"
-  #"${FFMPEG_INCLUDE_DIR}"
-  #"${STOREHOUSE_INCLUDE_DIRS}"
-  #"${GLOG_INCLUDE_DIRS}"
+  "${FFMPEG_INCLUDE_DIR}"
+  "${GLOG_INCLUDE_DIRS}"
   "${PYTHON_INCLUDE_DIRS}"
   "${Boost_INCLUDE_DIRS}")
 

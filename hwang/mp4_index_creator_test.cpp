@@ -37,7 +37,7 @@ TEST(MP4IndexCreator, SimpleTest) {
       indexer.feed(video_bytes.data() + current_offset, size_to_read,
                    current_offset, size_to_read);
     }
-    assert(!indexer.is_error());
+    ASSERT_FALSE(indexer.is_error());
     indexer.get_video_index();
   }
 }

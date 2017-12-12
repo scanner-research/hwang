@@ -15,9 +15,9 @@
 
 #pragma once
 
-#include "scanner/api/kernel.h"
-#include "scanner/util/queue.h"
-#include "scanner/video/video_decoder.h"
+#include "hwang/video_decoder_interface.h"
+#include "hwang/common.h"
+#include "hwang/util/queue.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -34,25 +34,27 @@ extern "C" {
 #include <mutex>
 #include <vector>
 
-namespace scanner {
-namespace internal {
+namespace hwang {
 
 ///////////////////////////////////////////////////////////////////////////////
 /// SoftwareVideoDecoder
-class SoftwareVideoDecoder : public VideoDecoder {
- public:
-  SoftwareVideoDecoder(i32 device_id, DeviceType output_type, i32 thread_count);
+class SoftwareVideoDecoder : public VideoDecoderInterface {
+public:
+  SoftwareVideoDecoder(int32_t device_id, DeviceType output_type,
+                       int32_t thread_count);
 
   ~SoftwareVideoDecoder();
 
-  void configure(const FrameInfo& metadata) override;
+  void configure(const FrameInfo &metadata,
+                 const std::vector<uint8_t>& extradata) override;
 
-  bool feed(const u8* encoded_buffer, size_t encoded_size,
+  bool feed(const uint8_t* encoded_buffer, size_t encoded_size,
+            bool keyframe,
             bool discontinuity = false) override;
 
   bool discard_frame() override;
 
-  bool get_frame(u8* decoded_buffer, size_t decoded_size) override;
+  bool get_frame(uint8_t* decoded_buffer, size_t decoded_size) override;
 
   int decoded_frames_buffered() override;
 
@@ -66,16 +68,18 @@ class SoftwareVideoDecoder : public VideoDecoder {
   AVPacket packet_;
   AVCodec* codec_;
   AVCodecContext* cc_;
+  AVBitStreamFilterContext* annexb_;
+  std::vector<uint8_t> extradata_;
 
   FrameInfo metadata_;
-  i32 frame_width_;
-  i32 frame_height_;
-  std::vector<u8> conversion_buffer_;
+  int32_t frame_width_;
+  int32_t frame_height_;
+  std::vector<uint8_t> conversion_buffer_;
   bool reset_context_;
   SwsContext* sws_context_;
 
   Queue<AVFrame*> frame_pool_;
   Queue<AVFrame*> decoded_frame_queue_;
 };
-}
-}
+
+} // namespace hwang

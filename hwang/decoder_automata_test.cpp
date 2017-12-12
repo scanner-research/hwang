@@ -1,6 +1,4 @@
-/* Copyright 2016 Carnegie Mellon University
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
+/* Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -13,9 +11,10 @@
  * limitations under the License.
  */
 
-#include "scanner/video/decoder_automata.h"
-#include "scanner/util/fs.h"
-#include "tests/videos.h"
+#include "hwang/mp4_index_creator.h"
+#include "hwang/decoder_automata.h"
+#include "hwang/util/fs.h"
+#include "hwang/tests/videos.h"
 
 #include <gtest/gtest.h>
 
@@ -25,110 +24,137 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 }
 
-namespace scanner {
-namespace internal {
+namespace hwang {
+
 TEST(DecoderAutomata, GetAllFrames) {
+  std::vector<TestVideoInfo> videos = {test_video_fragmented,
+                                       test_video_unfragmented};
+
   avcodec_register_all();
 
-  MemoryPoolConfig config;
-  init_memory_allocators(config, {});
-  std::unique_ptr<storehouse::StorageConfig> sc(
-      storehouse::StorageConfig::make_posix_config());
+  // Load test data
+  std::vector<uint8_t> video_bytes =
+      read_entire_file(download_video(videos[0]));
 
-  auto storage = storehouse::StorageBackend::make_from_config(sc.get());
+  // Create video index
+  MP4IndexCreator indexer(video_bytes.size());
+  uint64_t current_offset = 0;
+  uint64_t size_to_read = std::min((size_t)1024, video_bytes.size());
+  while (!indexer.is_done()) {
+    indexer.feed(video_bytes.data() + current_offset, size_to_read,
+                 current_offset, size_to_read);
+  }
+  ASSERT_FALSE(indexer.is_error());
+  VideoIndex video_index = indexer.get_video_index();
+
+  // Create decoder
   VideoDecoderType decoder_type = VideoDecoderType::SOFTWARE;
   DeviceHandle device = CPU_DEVICE;
   DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
 
-  // Load test data
-  VideoMetadata video_meta =
-      read_video_metadata(storage, download_video_meta(short_video));
-  std::vector<u8> video_bytes = read_entire_file(download_video(short_video));
-  u8* video_buffer = new_buffer(CPU_DEVICE, video_bytes.size());
-  memcpy_buffer(video_buffer, CPU_DEVICE, video_bytes.data(), CPU_DEVICE,
-                video_bytes.size());
+  // Grab frames
+  std::vector<DecoderAutomata::EncodedData> args;
+  uint64_t last_endpoint = 1000000;
+  // Walk by keyframes
+  auto kf_indices = video_index.keyframe_indices();
+  kf_indices.push_back(video_index.frames());
+  for (uint64_t kf = 0; kf < kf_indices.size() - 1; ++kf) {
+    uint64_t kfi = kf_indices.at(kf);
+    uint64_t kfi_end = kf_indices.at(kf + 1);
+    printf("last endpoint %lu, offset %lu\n", last_endpoint,
+           video_index.sample_offsets().at(kfi));
+    if (video_index.sample_offsets().at(kfi) != last_endpoint) {
+      if (args.size() > 0) {
+        DecoderAutomata::EncodedData& decode_args = args.back();
+        decode_args.end_keyframe = kfi;
+        decode_args.keyframes.push_back(kfi);
+      }
+      args.emplace_back();
+      {
+        DecoderAutomata::EncodedData &decode_args = args.back();
+        decode_args.width = video_index.frame_width();
+        decode_args.height = video_index.frame_height();
+        decode_args.start_keyframe = kfi;
+      }
+    }
+    DecoderAutomata::EncodedData& decode_args = args.back();
+    for (uint64_t r = kfi; r < kfi_end; r++) {
+      decode_args.valid_frames.push_back(r);
+      decode_args.sample_offsets.push_back(video_index.sample_offsets().at(r));
+      decode_args.sample_sizes.push_back(video_index.sample_sizes().at(r));
+    }
+    decode_args.keyframes.push_back(kfi);
+    decode_args.encoded_video = video_bytes;
 
-  std::vector<proto::DecodeArgs> args;
-  args.emplace_back();
-  proto::DecodeArgs& decode_args = args.back();
-  decode_args.set_width(video_meta.width());
-  decode_args.set_height(video_meta.height());
-  decode_args.set_start_keyframe(0);
-  decode_args.set_end_keyframe(video_meta.frames());
-  for (i64 r = 0; r < video_meta.frames(); ++r) {
-    decode_args.add_valid_frames(r);
+    last_endpoint = video_index.sample_offsets().at(kfi_end - 1) +
+                    video_index.sample_sizes().at(kfi_end - 1);
   }
-  for (i64 k : video_meta.keyframe_positions()) {
-    decode_args.add_keyframes(k);
-  }
-  for (i64 k : video_meta.keyframe_byte_offsets()) {
-    decode_args.add_keyframe_byte_offsets(k);
-  }
-  decode_args.set_encoded_video((i64)video_buffer);
-  decode_args.set_encoded_video_size(video_bytes.size());
+  printf("num args %lu\n", args.size());
 
-  decoder->initialize(args);
+  decoder->initialize(args, video_index.metadata_bytes());
 
-  std::vector<u8> frame_buffer(short_video.width * short_video.height * 3);
-  for (i64 i = 0; i < video_meta.frames(); ++i) {
+  std::vector<uint8_t> frame_buffer(video_index.frame_width() *
+                                    video_index.frame_height() * 3);
+  for (int64_t i = 0; i < video_index.frames(); ++i) {
     decoder->get_frames(frame_buffer.data(), 1);
   }
 
   delete decoder;
-  delete storage;
-  destroy_memory_allocators();
 }
 
-TEST(DecoderAutomata, GetStridedFrames) {
-  avcodec_register_all();
+// TEST(DecoderAutomata, GetStridedFrames) {
+//   std::vector<TestVideoInfo> videos = {test_video_fragmented,
+//                                        test_video_unfragmented};
 
-  MemoryPoolConfig config;
-  init_memory_allocators(config, {});
-  std::unique_ptr<storehouse::StorageConfig> sc(
-      storehouse::StorageConfig::make_posix_config());
+//   avcodec_register_all();
 
-  auto storage = storehouse::StorageBackend::make_from_config(sc.get());
-  VideoDecoderType decoder_type = VideoDecoderType::SOFTWARE;
-  DeviceHandle device = CPU_DEVICE;
-  DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+//   // Load test data
+//   std::vector<uint8_t> video_bytes =
+//       read_entire_file(download_video(videos[0]));
 
-  // Load test data
-  VideoMetadata video_meta =
-      read_video_metadata(storage, download_video_meta(short_video));
-  std::vector<u8> video_bytes = read_entire_file(download_video(short_video));
-  u8* video_buffer = new_buffer(CPU_DEVICE, video_bytes.size());
-  memcpy_buffer(video_buffer, CPU_DEVICE, video_bytes.data(), CPU_DEVICE,
-                video_bytes.size());
+//   // Create video index
+//   MP4IndexCreator indexer(video_bytes.size());
+//   uint64_t current_offset = 0;
+//   uint64_t size_to_read = std::min((size_t)1024, video_bytes.size());
+//   while (!indexer.is_done()) {
+//     indexer.feed(video_bytes.data() + current_offset, size_to_read,
+//                  current_offset, size_to_read);
+//   }
+//   ASSERT_FALSE(indexer.is_error());
+//   VideoIndex video_index = indexer.get_video_index();
 
-  std::vector<proto::DecodeArgs> args;
-  args.emplace_back();
-  proto::DecodeArgs& decode_args = args.back();
-  decode_args.set_width(video_meta.width());
-  decode_args.set_height(video_meta.height());
-  decode_args.set_start_keyframe(0);
-  decode_args.set_end_keyframe(video_meta.frames());
-  for (i64 r = 0; r < video_meta.frames(); r += 2) {
-    decode_args.add_valid_frames(r);
-  }
-  for (i64 k : video_meta.keyframe_positions()) {
-    decode_args.add_keyframes(k);
-  }
-  for (i64 k : video_meta.keyframe_byte_offsets()) {
-    decode_args.add_keyframe_byte_offsets(k);
-  }
-  decode_args.set_encoded_video((i64)video_buffer);
-  decode_args.set_encoded_video_size(video_bytes.size());
+//   // Create decoder
+//   VideoDecoderType decoder_type = VideoDecoderType::SOFTWARE;
+//   DeviceHandle device = CPU_DEVICE;
+//   DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
 
-  decoder->initialize(args);
+//   // Grab frames
+//   std::vector<DecoderAutomata::EncodedData> args;
+//   args.emplace_back();
+//   DecoderAutomata::EncodedData& decode_args = args.back();
+//   decode_args.width = video_index.frame_width();
+//   decode_args.height = video_index.frame_height();
+//   decode_args.start_keyframe = 0;
+//   decode_args.end_keyframe = video_index.frames();
+//   for (uint64_t r = 0; r < video_index.frames(); r += 2) {
+//     decode_args.valid_frames.push_back(r);
+//   }
+//   for (uint64_t k : video_index.keyframe_indices()) {
+//     decode_args.keyframes.push_back(k);
+//   }
+//   for (uint64_t k : video_index.sample_offsets()) {
+//     decode_args.sample_offsets.push_back(k);
+//   }
+//   decode_args.encoded_video = video_bytes;
+//   decoder->initialize(args);
 
-  std::vector<u8> frame_buffer(short_video.width * short_video.height * 3);
-  for (i64 i = 0; i < video_meta.frames() / 2; ++i) {
-    decoder->get_frames(frame_buffer.data(), 1);
-  }
+//   std::vector<uint8_t> frame_buffer(video_index.frame_width() *
+//                                     video_index.frame_height() * 3);
+//   for (int64_t i = 0; i < video_index.frames() / 2; ++i) {
+//     decoder->get_frames(frame_buffer.data(), 1);
+//   }
 
-  delete decoder;
-  delete storage;
-  destroy_memory_allocators();
-}
-}
+//   delete decoder;
+// }
+
 }

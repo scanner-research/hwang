@@ -59,9 +59,12 @@ class MP4IndexCreator {
 
   std::vector<TrackExtendsBox> track_extends_boxes_;
 
+  uint32_t width_;
+  uint32_t height_;
   std::vector<uint64_t> sample_offsets_;
   std::vector<uint64_t> sample_sizes_;
   std::vector<uint64_t> keyframe_indices_;
+  std::vector<uint8_t> extradata_;
 };
 
 }

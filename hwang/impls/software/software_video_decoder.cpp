@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#include "scanner/video/software/software_video_decoder.h"
-#include "scanner/util/h264.h"
+#include "hwang/impls/software/software_video_decoder.h"
+#include "hwang/util/h264.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -26,20 +26,21 @@ extern "C" {
 #include "libswscale/swscale.h"
 }
 
-#ifdef HAVE_CUDA
-#include "scanner/util/cuda.h"
-#endif
-
 #include <cassert>
 
-namespace scanner {
-namespace internal {
+namespace hwang {
 
+namespace {
+// Dummy until we add back the profiler
+int32_t now() {
+  return 0;
+}
+}
 ///////////////////////////////////////////////////////////////////////////////
 /// SoftwareVideoDecoder
-SoftwareVideoDecoder::SoftwareVideoDecoder(i32 device_id,
+SoftwareVideoDecoder::SoftwareVideoDecoder(int32_t device_id,
                                            DeviceType output_type,
-                                           i32 thread_count)
+                                           int32_t thread_count)
   : device_id_(device_id),
     output_type_(output_type),
     codec_(nullptr),
@@ -69,6 +70,7 @@ SoftwareVideoDecoder::SoftwareVideoDecoder(i32 device_id,
     fprintf(stderr, "could not open codec\n");
     assert(false);
   }
+  annexb_ = nullptr;
 }
 
 SoftwareVideoDecoder::~SoftwareVideoDecoder() {
@@ -92,40 +94,67 @@ SoftwareVideoDecoder::~SoftwareVideoDecoder() {
   sws_freeContext(sws_context_);
 }
 
-void SoftwareVideoDecoder::configure(const FrameInfo& metadata) {
+void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
+                                     const std::vector<uint8_t> &extradata) {
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+
   metadata_ = metadata;
-  frame_width_ = metadata_.width();
-  frame_height_ = metadata_.height();
+  frame_width_ = metadata_.width;
+  frame_height_ = metadata_.height;
   reset_context_ = true;
 
   int required_size = av_image_get_buffer_size(AV_PIX_FMT_RGB24, frame_width_,
                                                frame_height_, 1);
 
   conversion_buffer_.resize(required_size);
+
+  extradata_ = extradata;
+  cc_->extradata = extradata_.data();
+  cc_->extradata_size = extradata_.size();
+
+  annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
 }
 
-bool SoftwareVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
+bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
+                                size_t encoded_size, bool keyframe,
                                 bool discontinuity) {
+  uint8_t *filtered_buffer = nullptr;
+  int32_t filtered_size = 0;
+  int err;
+  if (encoded_size > 0) {
+    err = av_bitstream_filter_filter(annexb_, cc_, NULL, &filtered_buffer,
+                                     &filtered_size, encoded_buffer,
+                                     encoded_size, keyframe);
+    if (err < 0) {
+      char err_msg[256];
+      av_strerror(err, err_msg, 256);
+      LOG(FATAL) << "Error while filtering frame (" +
+                        std::to_string(err) + "): " + std::string(err_msg);
+    }
+  }
+
 // Debug read packets
 #if 0
-  i32 es = (i32)encoded_size;
-  const u8* b = encoded_buffer;
+  int32_t es = (int32_t)filtered_data_size;
+  const uint8_t* b = filtered_buffer;
   while (es > 0) {
-    const u8* nal_start;
-    i32 nal_size;
+    const uint8_t* nal_start;
+    int32_t nal_size;
     next_nal(b, es, nal_start, nal_size);
-    i32 nal_unit_type = get_nal_unit_type(nal_start);
+    int32_t nal_unit_type = get_nal_unit_type(nal_start);
     printf("nal unit type %d\n", nal_unit_type);
 
     if (nal_unit_type == 7) {
-      i32 offset = 32;
-      i32 sps_id = parse_exp_golomb(nal_start, nal_size, offset);
+      int32_t offset = 32;
+      int32_t sps_id = parse_exp_golomb(nal_start, nal_size, offset);
       printf("SPS NAL (%d)\n", sps_id);
     }
     if (nal_unit_type == 8) {
-      i32 offset = 8;
-      i32 pps_id = parse_exp_golomb(nal_start, nal_size, offset);
-      i32 sps_id = parse_exp_golomb(nal_start, nal_size, offset);
+      int32_t offset = 8;
+      int32_t pps_id = parse_exp_golomb(nal_start, nal_size, offset);
+      int32_t sps_id = parse_exp_golomb(nal_start, nal_size, offset);
       printf("PPS id: %d, SPS id: %d\n", pps_id, sps_id);
     }
   }
@@ -145,14 +174,18 @@ bool SoftwareVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
     packet_.data = NULL;
     packet_.size = 0;
     feed_packet(true);
+
+    if (filtered_buffer) {
+      free(filtered_buffer);
+    }
     return false;
   }
-  if (encoded_size > 0) {
-    if (av_new_packet(&packet_, encoded_size) < 0) {
+  if (filtered_size > 0) {
+    if (av_new_packet(&packet_, filtered_size) < 0) {
       fprintf(stderr, "could not allocate packet for feeding into decoder\n");
       assert(false);
     }
-    memcpy(packet_.data, encoded_buffer, encoded_size);
+    memcpy(packet_.data, filtered_buffer, filtered_size);
   } else {
     packet_.data = NULL;
     packet_.size = 0;
@@ -160,6 +193,10 @@ bool SoftwareVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
 
   feed_packet(false);
   av_packet_unref(&packet_);
+
+  if (filtered_buffer) {
+    free(filtered_buffer);
+  }
 
   return decoded_frame_queue_.size() > 0;
 }
@@ -175,7 +212,7 @@ bool SoftwareVideoDecoder::discard_frame() {
   return decoded_frame_queue_.size() > 0;
 }
 
-bool SoftwareVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
+bool SoftwareVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_size) {
   int64_t size_left = decoded_size;
 
   AVFrame* frame;
@@ -194,17 +231,17 @@ bool SoftwareVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
         frame_height_, AV_PIX_FMT_RGB24, SWS_BICUBIC, NULL, NULL, NULL);
     reset_context_ = false;
     auto get_context_end = now();
-    if (profiler_) {
-      profiler_->add_interval("ffmpeg:get_sws_context", get_context_start,
-                              get_context_end);
-    }
+    // if (profiler_) {
+    //   profiler_->add_interval("ffmpeg:get_sws_context", get_context_start,
+    //                           get_context_end);
+    // }
   }
 
   if (sws_context_ == NULL) {
     LOG(FATAL) << "Could not get sws_context for rgb conversion";
   }
 
-  u8* scale_buffer = decoded_buffer;
+  uint8_t* scale_buffer = decoded_buffer;
 
   uint8_t* out_slices[4];
   int out_linesizes[4];
@@ -227,9 +264,9 @@ bool SoftwareVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
   av_frame_unref(frame);
   frame_pool_.push(frame);
 
-  if (profiler_) {
-    profiler_->add_interval("ffmpeg:scale_frame", scale_start, scale_end);
-  }
+  // if (profiler_) {
+  //   profiler_->add_interval("ffmpeg:scale_frame", scale_start, scale_end);
+  // }
 
   return decoded_frame_queue_.size() > 0;
 }
@@ -241,9 +278,10 @@ int SoftwareVideoDecoder::decoded_frames_buffered() {
 void SoftwareVideoDecoder::wait_until_frames_copied() {}
 
 void SoftwareVideoDecoder::feed_packet(bool flush) {
+  int error;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 25, 0)
   auto send_start = now();
-  int error = avcodec_send_packet(cc_, &packet_);
+  error = avcodec_send_packet(cc_, &packet_);
   if (error != AVERROR_EOF) {
     if (error < 0) {
       char err_msg[256];
@@ -289,11 +327,11 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
     }
   }
   auto received_end = now();
-  if (profiler_) {
-    profiler_->add_interval("ffmpeg:send_packet", send_start, send_end);
-    profiler_->add_interval("ffmpeg:receive_frame", received_start,
-                            received_end);
-  }
+  // if (profiler_) {
+  //   profiler_->add_interval("ffmpeg:send_packet", send_start, send_end);
+  //   profiler_->add_interval("ffmpeg:receive_frame", received_start,
+  //                           received_end);
+  // }
 #else
   uint8_t* orig_data = packet_.data;
   int orig_size = packet_.size;
@@ -312,9 +350,9 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
     auto decode_start = now();
     int consumed_length =
         avcodec_decode_video2(cc_, frame, &got_picture, &packet_);
-    if (profiler_) {
-      profiler_->add_interval("ffmpeg:decode_video", decode_start, now());
-    }
+    // if (profiler_) {
+    //   profiler_->add_interval("ffmpeg:decode_video", decode_start, now());
+    // }
     if (consumed_length < 0) {
       char err_msg[256];
       av_strerror(consumed_length, err_msg, 256);
@@ -354,5 +392,5 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
     avcodec_flush_buffers(cc_);
   }
 }
-}
+
 }

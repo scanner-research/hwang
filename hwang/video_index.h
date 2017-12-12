@@ -22,20 +22,18 @@ class VideoIndex {
  public:
   VideoIndex() {};
 
-  VideoIndex(uint64_t num_frames, const std::vector<uint8_t> &metadata,
+  VideoIndex(uint32_t width, uint32_t height,
              const std::vector<uint64_t> &sample_offsets,
              const std::vector<uint64_t> &sample_sizes,
-             const std::vector<uint64_t> &keyframe_indices)
-      : num_frames_(num_frames), metadata_bytes_(metadata),
-        sample_offsets_(sample_offsets),
-        sample_sizes_(sample_sizes),
-        keyframe_indices_(keyframe_indices) {};
+             const std::vector<uint64_t> &keyframe_indices,
+             const std::vector<uint8_t> &metadata)
+      : frame_width_(width), frame_height_(height), num_frames_(sample_sizes.size()),
+        sample_offsets_(sample_offsets), sample_sizes_(sample_sizes),
+        keyframe_indices_(keyframe_indices), metadata_bytes_(metadata){};
 
   static VideoIndex deserialize(const std::vector<uint8_t>& data);
 
   std::vector<uint8_t> serialize() const;
-
-  const std::vector<uint8_t>& metadata_bytes() const { return metadata_bytes_; }
 
   const std::vector<uint64_t> &sample_sizes() const {
     return sample_sizes_;
@@ -49,17 +47,23 @@ class VideoIndex {
     return keyframe_indices_;
   }
 
-  uint64_t frames() const { return num_frames_; };
-  uint64_t num_non_ref_frames() const { return num_non_ref_frames_; };
+  const std::vector<uint8_t>& metadata_bytes() const { return metadata_bytes_; }
+
+  uint32_t frame_width() const { return frame_width_; }
+  uint32_t frame_height() const { return frame_height_; }
+  uint64_t frames() const { return num_frames_; }
+  uint64_t num_non_ref_frames() const { return num_non_ref_frames_; }
 
 private:
+  uint32_t frame_width_;
+  uint32_t frame_height_;
   uint64_t num_frames_;
   uint64_t num_non_ref_frames_ = 0;
-  std::vector<uint8_t> metadata_bytes_;
-
   std::vector<uint64_t> sample_offsets_;
   std::vector<uint64_t> sample_sizes_;
   std::vector<uint64_t> keyframe_indices_;
+  std::vector<uint8_t> metadata_bytes_;
+
 };
 
 struct VideoIntervals {
