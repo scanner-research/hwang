@@ -111,7 +111,10 @@ void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
   conversion_buffer_.resize(required_size);
 
   extradata_ = extradata;
-  cc_->extradata = extradata_.data();
+  extradata_.resize(extradata.size() + AV_INPUT_BUFFER_PADDING_SIZE);
+
+  cc_->extradata = (uint8_t*)malloc(extradata_.size());
+  memcpy(cc_->extradata, extradata_.data(), extradata_.size());
   cc_->extradata_size = extradata_.size();
 
   annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
@@ -120,9 +123,15 @@ void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
 bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
                                 size_t encoded_size, bool keyframe,
                                 bool discontinuity) {
+  if (discontinuity) {
+    printf("discontinuity\n");
+  }
+  printf("data size %d, keyframe %d, current %p, next  %p\n", encoded_size,
+         keyframe, encoded_buffer, encoded_buffer + encoded_size);
   uint8_t *filtered_buffer = nullptr;
   int32_t filtered_size = 0;
   int err;
+  av_log_set_level(1000);
   if (encoded_size > 0) {
     err = av_bitstream_filter_filter(annexb_, cc_, NULL, &filtered_buffer,
                                      &filtered_size, encoded_buffer,
@@ -178,6 +187,16 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     if (filtered_buffer) {
       free(filtered_buffer);
     }
+    // Reinitialize filter
+    if (annexb_) {
+      av_bitstream_filter_close(annexb_);
+    }
+
+    cc_->extradata = (uint8_t *)malloc(extradata_.size());
+    memcpy(cc_->extradata, extradata_.data(), extradata_.size());
+    cc_->extradata_size = extradata_.size();
+
+    annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
     return false;
   }
   if (filtered_size > 0) {

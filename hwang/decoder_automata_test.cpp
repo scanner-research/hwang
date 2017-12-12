@@ -76,6 +76,7 @@ TEST(DecoderAutomata, GetAllFrames) {
         decode_args.height = video_index.frame_height();
         decode_args.start_keyframe = kfi;
       }
+      printf("new args %d\n", kfi);
     }
     DecoderAutomata::EncodedData& decode_args = args.back();
     for (uint64_t r = kfi; r < kfi_end; r++) {
@@ -83,20 +84,27 @@ TEST(DecoderAutomata, GetAllFrames) {
       decode_args.sample_offsets.push_back(video_index.sample_offsets().at(r));
       decode_args.sample_sizes.push_back(video_index.sample_sizes().at(r));
     }
+    printf("valid frames %d-%d\n", kfi, kfi_end);
     decode_args.keyframes.push_back(kfi);
     decode_args.encoded_video = video_bytes;
 
     last_endpoint = video_index.sample_offsets().at(kfi_end - 1) +
                     video_index.sample_sizes().at(kfi_end - 1);
   }
+  {
+    DecoderAutomata::EncodedData& decode_args = args.back();
+    decode_args.end_keyframe = video_index.frames();
+    decode_args.keyframes.push_back(video_index.frames());
+  }
   printf("num args %lu\n", args.size());
 
   decoder->initialize(args, video_index.metadata_bytes());
 
-  std::vector<uint8_t> frame_buffer(video_index.frame_width() *
-                                    video_index.frame_height() * 3);
-  for (int64_t i = 0; i < video_index.frames(); ++i) {
-    decoder->get_frames(frame_buffer.data(), 1);
+  for (auto& arg : args) {
+    std::vector<uint8_t> frame_buffer(video_index.frame_width() *
+                                      video_index.frame_height() * 3 *
+                                      arg.valid_frames.size());
+    decoder->get_frames(frame_buffer.data(), arg.valid_frames.size());
   }
 
   delete decoder;

@@ -265,7 +265,8 @@ void DecoderAutomata::feeder() {
       int32_t encoded_packet_size = 0;
       const uint8_t *encoded_packet = NULL;
       bool is_keyframe = false;
-      if (feeder_buffer_offset_ < encoded_buffer_size) {
+      if (feeder_buffer_offset_ < encoded_buffer_size &&
+          feeder_current_frame_ < encoded_data_[fdi].end_keyframe) {
         uint64_t start_keyframe = encoded_data_[fdi].start_keyframe;
         encoded_packet_size =
             encoded_data_[fdi]
@@ -276,8 +277,11 @@ void DecoderAutomata::feeder() {
 
         if (feeder_current_frame_ == feeder_next_keyframe_) {
           feeder_next_keyframe_idx_++;
-          if (feeder_next_keyframe_idx_ < encoded_data_[feeder_data_idx_].keyframes.size()) {
-            feeder_next_keyframe_ = encoded_data_[feeder_data_idx_].keyframes.at(feeder_next_keyframe_idx_);
+          if (feeder_next_keyframe_idx_ <
+              encoded_data_[feeder_data_idx_].keyframes.size()) {
+            feeder_next_keyframe_ =
+                encoded_data_[feeder_data_idx_].keyframes.at(
+                    feeder_next_keyframe_idx_);
           }
           is_keyframe = true;
         }
@@ -308,6 +312,8 @@ void DecoderAutomata::feeder() {
       //   }
       // }
 
+      printf("feeding frame %d, %d, %d\n", feeder_current_frame_.load(),
+             feeder_buffer_offset_.load(), encoded_buffer_size);
       decoder_->feed(encoded_packet, encoded_packet_size, is_keyframe, false);
 
       if (feeder_current_frame_ == feeder_next_frame_) {
@@ -326,7 +332,7 @@ void DecoderAutomata::feeder() {
       // Set a discontinuity if we sent an empty packet to reset
       // the stream next time
       if (encoded_packet_size == 0) {
-        assert(feeder_buffer_offset_ >= encoded_buffer_size);
+        //assert(feeder_buffer_offset_ >= encoded_buffer_size);
         // Reached the end of a decoded segment so wait for decoder to flush
         // before moving onto next segment
         seen_metadata = false;
@@ -344,12 +350,15 @@ void DecoderAutomata::feeder() {
 void DecoderAutomata::set_feeder_idx(int32_t data_idx) {
   feeder_data_idx_ = data_idx;
   feeder_valid_idx_ = 0;
-  feeder_buffer_offset_ = encoded_data_[feeder_data_idx_].sample_offsets.at(0);
+  feeder_buffer_offset_ = 0;
   if (feeder_data_idx_ < encoded_data_.size()) {
+    feeder_buffer_offset_ =
+        encoded_data_[feeder_data_idx_].sample_offsets.at(0);
     feeder_current_frame_ = encoded_data_[feeder_data_idx_].keyframes.at(0);
     feeder_next_frame_ = encoded_data_[feeder_data_idx_].valid_frames.at(0);
-    feeder_next_keyframe_idx_ = 1;
-    feeder_next_keyframe_ = encoded_data_[feeder_data_idx_].keyframes.at(feeder_next_keyframe_idx_);
+    feeder_next_keyframe_idx_ = 0;
+    feeder_next_keyframe_ =
+        encoded_data_[feeder_data_idx_].keyframes.at(feeder_next_keyframe_idx_);
   }
 }
 } // namespace hwang

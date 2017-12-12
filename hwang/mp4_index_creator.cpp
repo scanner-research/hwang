@@ -426,10 +426,11 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                               FullBox b2 = parse_box(vs_bs2);
                               printf("b2 type %s\n", type_to_string(b2.type).c_str());
                               if (b2.type == string_to_type("avcC")) {
-                                size_t size = b2.size;
+                                size_t size = b2.size - (vs_bs2.offset / 8 -
+                                                         vs_bs.offset / 8);
                                 extradata.resize(size);
                                 memcpy(extradata.data(),
-                                       vs_bs.buffer, size);
+                                       vs_bs2.buffer + vs_bs2.offset / 8, size);
                               }
                             }
                             stsd_bs.offset += vs.size * 8;
