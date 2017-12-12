@@ -34,22 +34,32 @@ std::vector<uint8_t> VideoIndex::serialize() const {
 
 VideoIntervals slice_into_video_intervals(const VideoIndex &index,
                                           const std::vector<uint64_t> &rows) {
-  const auto& keyframe_positions = index.keyframe_indices();
+  auto keyframe_positions = index.keyframe_indices();
+  keyframe_positions.push_back(index.frames() - 1);
   VideoIntervals info;
   assert(keyframe_positions.size() >= 2);
   size_t start_keyframe_index = 0;
   size_t end_keyframe_index = 1;
   uint64_t next_keyframe = keyframe_positions[end_keyframe_index];
   std::vector<uint64_t> valid_frames;
+
   for (uint64_t row : rows) {
     if (row >= next_keyframe) {
+      // Check if this keyframe is adjacent
+      uint64_t last_endpoint = index.sample_offsets().at(next_keyframe - 1) +
+                               index.sample_sizes().at(next_keyframe - 1);
+      bool is_adjacent =
+          (last_endpoint == index.sample_offsets().at(next_keyframe));
+
       assert(end_keyframe_index < keyframe_positions.size() - 1);
       next_keyframe = keyframe_positions[++end_keyframe_index];
-      if (row >= next_keyframe) {
-        // Skipped a keyframe, so make a new interval
+
+      if (row >= next_keyframe || !is_adjacent) {
+        // Skipped a keyframe or keyframe is not adjacent, make a new interval
         if (!valid_frames.empty()) {
           info.sample_index_intervals.push_back(
-              std::make_tuple(start_keyframe_index, end_keyframe_index - 1));
+              std::make_tuple(keyframe_positions[start_keyframe_index],
+                              keyframe_positions[end_keyframe_index - 1]));
           info.valid_frames.push_back(valid_frames);
         }
 
@@ -65,7 +75,8 @@ VideoIntervals slice_into_video_intervals(const VideoIndex &index,
     valid_frames.push_back(row);
   }
   info.sample_index_intervals.push_back(
-      std::make_tuple(start_keyframe_index, end_keyframe_index));
+      std::make_tuple(keyframe_positions[start_keyframe_index],
+                      keyframe_positions[end_keyframe_index]));
   info.valid_frames.push_back(valid_frames);
   return info;
 }

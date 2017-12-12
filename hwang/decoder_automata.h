@@ -37,6 +37,16 @@ class DecoderAutomata {
   ~DecoderAutomata();
 
   struct EncodedData {
+    inline bool operator==(const EncodedData &other) const
+    {
+      return encoded_video == other.encoded_video && width == other.width &&
+             height == other.height && start_keyframe == other.start_keyframe &&
+             end_keyframe == other.end_keyframe &&
+             sample_offsets == other.sample_offsets &&
+             sample_sizes == other.sample_sizes &&
+             keyframes == other.keyframes && valid_frames == other.valid_frames;
+    }
+
     std::vector<uint8_t> encoded_video;
     uint32_t width;
     uint32_t height;

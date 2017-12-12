@@ -49,6 +49,10 @@ SoftwareVideoDecoder::SoftwareVideoDecoder(int32_t device_id,
     sws_context_(nullptr),
     frame_pool_(1024),
     decoded_frame_queue_(1024) {
+
+  // TODO(apoms): put a global file lock around this
+  avcodec_register_all();
+
   av_init_packet(&packet_);
 
   codec_ = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -123,15 +127,9 @@ void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
 bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
                                 size_t encoded_size, bool keyframe,
                                 bool discontinuity) {
-  if (discontinuity) {
-    printf("discontinuity\n");
-  }
-  printf("data size %d, keyframe %d, current %p, next  %p\n", encoded_size,
-         keyframe, encoded_buffer, encoded_buffer + encoded_size);
   uint8_t *filtered_buffer = nullptr;
   int32_t filtered_size = 0;
   int err;
-  av_log_set_level(1000);
   if (encoded_size > 0) {
     err = av_bitstream_filter_filter(annexb_, cc_, NULL, &filtered_buffer,
                                      &filtered_size, encoded_buffer,

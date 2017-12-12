@@ -96,7 +96,6 @@ TEST(DecoderAutomata, GetAllFrames) {
     decode_args.end_keyframe = video_index.frames();
     decode_args.keyframes.push_back(video_index.frames());
   }
-  printf("num args %lu\n", args.size());
 
   decoder->initialize(args, video_index.metadata_bytes());
 

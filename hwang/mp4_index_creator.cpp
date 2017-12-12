@@ -110,13 +110,13 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                            std::function<bool(GetBitsState &)> fn) {
     while ((bs.offset / 8) < bs.size) {
       FullBox b = probe_box_type(bs);
-      printf("looking for %s, parsed box type: %s, parsed size: %ld, "
-             "offset: %ld, size: %ld\n",
-             type_to_string(type).c_str(),
-             type_to_string(b.type).c_str(),
-             b.size,
-             bs.offset / 8,
-             bs.size);
+      // printf("looking for %s, parsed box type: %s, parsed size: %ld, "
+      //        "offset: %ld, size: %ld\n",
+      //        type_to_string(type).c_str(),
+      //        type_to_string(b.type).c_str(),
+      //        b.size,
+      //        bs.offset / 8,
+      //        bs.size);
       if (b.type == type) {
         GetBitsState bs2 = bs;
         bool result = fn(bs2);
@@ -133,12 +133,12 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   while ((bs.offset / 8) < bs.size && !is_done()) {
     // Get type of next box
     FullBox b = probe_box_type(bs);
-    printf("parsed box type: %s, size: %ld, bs off %ld, size %ld\n",
-           type_to_string(b.type).c_str(),
-           b.size,
-           bs.offset / 8,
-           bs.size
-           );
+    // printf("parsed box type: %s, size: %ld, bs off %ld, size %ld\n",
+    //        type_to_string(b.type).c_str(),
+    //        b.size,
+    //        bs.offset / 8,
+    //        bs.size
+    //        );
     assert(b.size != 0);
     if (!parsed_ftyp_ && b.type == type("ftyp")) {
       if (size_left() < b.size) {
@@ -408,23 +408,17 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                         search_for_box(bs, type("stsd"), [&](GetBitsState &bs) {
                           GetBitsState stsd_bs = restrict_bits_to_box(bs);
                           SampleDescriptionBox stsd = parse_stsd(stsd_bs);
-                          printf("sample count %d\n", stsd.entry_count);
                           for (size_t i = 0; i < stsd.entry_count; ++i) {
                             GetBitsState vs_bs = restrict_bits_to_box(stsd_bs);
                             VisualSampleEntry vs =
                                 parse_visual_sample_entry(vs_bs);
                             width = vs.width;
                             height = vs.height;
-                            printf("vs bs offset %lu, stsdbs siez %lu, type %s\n",
-                                   vs_bs.offset / 8,
-                                   stsd_bs.offset / 8 + vs.size,
-                                   type_to_string(vs.type).c_str());
                             if (vs_bs.offset / 8 <
                                 stsd_bs.offset / 8 + vs.size &&
                                 vs.type == string_to_type("avc1")) {
                               GetBitsState vs_bs2 = vs_bs;
                               FullBox b2 = parse_box(vs_bs2);
-                              printf("b2 type %s\n", type_to_string(b2.type).c_str());
                               if (b2.type == string_to_type("avcC")) {
                                 size_t size = b2.size - (vs_bs2.offset / 8 -
                                                          vs_bs.offset / 8);
@@ -694,7 +688,6 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
       }
 
 
-      printf("samples %ld\n", sample_sizes.size());
       bs.offset = (before_moof_offset + moof.size) * 8;
     } else {
       // If not a box we are interested in, skip to next box
@@ -707,8 +700,6 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
       MORE_DATA_LIMIT(offset_, 1024);
     }
     offset_ += b.size;
-    printf("global offset %lu, offset %lu, size %lu\n", offset_, bs.offset / 8,
-           bs.size);
   }
   if (is_done()) {
     return false;
