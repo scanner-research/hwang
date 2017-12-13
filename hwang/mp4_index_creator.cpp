@@ -387,7 +387,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                           SyncSampleBox stss = parse_stss(bs);
                           for (size_t i = 0; i < stss.sample_number.size();
                                ++i) {
-                            keyframe_indices.push_back(stss.sample_number[i]);
+                            keyframe_indices.push_back(stss.sample_number[i] - 1);
                           }
                           return true;
                         });

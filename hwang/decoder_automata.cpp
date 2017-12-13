@@ -81,6 +81,7 @@ void DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
   info.height = encoded_data[0].height;
   info.width = encoded_data[0].width;
 
+  // printf("extradata size %lu\n", extradata.size());
   decoder_->configure(info, extradata);
 
   if (frames_retrieved_ > 0) {
@@ -270,6 +271,9 @@ void DecoderAutomata::feeder() {
         encoded_packet_size =
             encoded_data_[fdi]
                 .sample_sizes[feeder_current_frame_ - start_keyframe];
+        feeder_buffer_offset_ =
+            encoded_data_[fdi]
+                .sample_offsets[feeder_current_frame_ - start_keyframe];
         encoded_packet = encoded_buffer + feeder_buffer_offset_;
         assert(0 <= encoded_packet_size &&
                encoded_packet_size < encoded_buffer_size);
@@ -312,7 +316,7 @@ void DecoderAutomata::feeder() {
       // }
 
       // printf("feeding frame %d, %d, %d\n", feeder_current_frame_.load(),
-      //        feeder_buffer_offset_.load(), encoded_buffer_size);
+      //        feeder_buffer_offset_.load(), encoded_buffer_size)i
       decoder_->feed(encoded_packet, encoded_packet_size, is_keyframe, false);
 
       if (feeder_current_frame_ == feeder_next_frame_) {

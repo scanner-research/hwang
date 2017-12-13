@@ -444,9 +444,9 @@ inline SampleToChunkBox parse_stsc(GetBitsState& bs, uint64_t num_samples) {
     uint32_t samples_per_chunk = get_bits(bs, 32);
     uint32_t sample_description_index = get_bits(bs, 32);
 
-    printf("first chunk %u, per chunk %u\n",
-           first_chunk,
-           samples_per_chunk);
+    // printf("first chunk %u, per chunk %u\n",
+    //        first_chunk,
+    //        samples_per_chunk);
     if (prev_first_chunk != 0) {
       SampleToChunkBox::ChunkEntry entry;
       entry.num_samples = prev_samples_per_chunk;
