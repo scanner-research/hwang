@@ -15,9 +15,9 @@ setup(
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',
 
-    packages=['python/hwang'],
+    packages=['hwang'],
     package_data={
-        'python': [
+        'hwang': [
             '*.so',
         ]
     },

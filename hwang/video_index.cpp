@@ -12,23 +12,26 @@
  */
 
 #include "hwang/video_index.h"
-#include "hwang/descriptors.pb.h"
+//#include "hwang/descriptors.pb.h"
 
 #include <string>
 #include <vector>
+#include <cassert>
+#include <tuple>
 
 namespace hwang {
 
 VideoIndex VideoIndex::deserialize(const std::vector<uint8_t> &data) {
-  proto::VideoIndex desc;
-  desc.ParseFromArray(data.data(), data.size());
+  // proto::VideoIndex desc;
+  // desc.ParseFromArray(data.data(), data.size());
   return VideoIndex();
 }
 
 std::vector<uint8_t> VideoIndex::serialize() const {
-  proto::VideoIndex desc;
-  std::vector<uint8_t> data(desc.ByteSizeLong());
-  desc.SerializeToArray(data.data(), data.size());
+  std::vector<uint8_t> data;
+  // proto::VideoIndex desc;
+  // std::vector<uint8_t> data(desc.ByteSizeLong());
+  // desc.SerializeToArray(data.data(), data.size());
   return data;
 }
 
