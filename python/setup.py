@@ -10,7 +10,7 @@ os.system('ln -s {from_path:s} {to_path:s}'.format(from_path=SO_PATH,
 
 setup(
     name='hwang',
-    version='0.0.1',
+    version='0.1.0',
     url='https://github.com/scanner-research/hwang',
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',

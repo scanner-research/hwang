@@ -1,10 +1,13 @@
-from video_index import *
-from decoder import *
+from .video_index import *
+from .decoder import *
 import os
 
 
-def index_video(f_or_string, size=None):
-    def w(f, size):
+def index_video(f_or_string):
+    def w(f):
+        f.seek(0, os.SEEK_END)
+        size = f.tell()
+        f.seek(0, 0)
         indexer = MP4IndexCreator(size)
         offset = 0
         size_to_read = 1024
@@ -19,9 +22,6 @@ def index_video(f_or_string, size=None):
 
     if isinstance(f_or_string, str):
         with open(f_or_string, 'rb') as f:
-            size = os.fstat(f.fileno()).st_size
-            return w(f, size)
+            return w(f)
     else:
-        if size is None:
-            raise Exception('Must provide file size')
-        return w(f_or_string, size)
+        return w(f_or_string)

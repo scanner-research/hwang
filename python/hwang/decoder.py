@@ -2,9 +2,9 @@ from .libhwang import *
 import hwang
 
 class Decoder(object):
-    def __init__(self, f_or_path, video_index=None, size=None):
+    def __init__(self, f_or_path, video_index=None):
         if video_index is None:
-            video_index = hwang.index_video(f_or_path, size=size)
+            video_index = hwang.index_video(f_or_path)
         self.video_index = video_index
 
         if isinstance(f_or_path, str):
