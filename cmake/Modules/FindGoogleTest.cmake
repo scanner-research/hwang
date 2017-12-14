@@ -23,15 +23,22 @@ if(WIN32)
     PATHS ${GOOGLETEST_ROOT_DIR}/src/windows)
 else()
   find_path(GOOGLETEST_INCLUDE_DIR gtest/gtest.h
+    HINTS
+    ${CMAKE_SOURCE_DIR}/thirdparty/install/include
     PATHS
     ${GOOGLETEST_ROOT_DIR}/include
-    ${CMAKE_SOURCE_DIR}/thirdparty/build/bin/googletest/include)
+    /usr/local/include
+    /usr/include)
 endif()
 
 find_library(GOOGLETEST_LIBRARY gtest
+  HINTS
+  ${CMAKE_SOURCE_DIR}/thirdparty/install/lib
   PATHS
   ${GOOGLETEST_ROOT_DIR}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/build/bin/googletest/lib)
+  ${CMAKE_SOURCE_DIR}/thirdparty/install/lib
+  /usr/local/lib
+  /usr/lib)
 
 find_package_handle_standard_args(GOOGLETEST DEFAULT_MSG
     GOOGLETEST_INCLUDE_DIR GOOGLETEST_LIBRARY)

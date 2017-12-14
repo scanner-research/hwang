@@ -58,6 +58,11 @@ if(NOT APPLE AND UNIX)
 endif()
 
 ###### Optional Dependencies #######
+set(THIRDPARTY_DIR ${CMAKE_SOURCE_DIR}/thirdparty/install)
+
+if (NOT EXISTS "$ENV{BOOSTROOT}" AND NOT EXISTS "${BOOSTROOT}")
+  set(BOOSTROOT ${THIRDPARTY_DIR})
+endif()
 
 ###### Required Dependencies #######
 #find_package(SaneProtobuf REQUIRED)
