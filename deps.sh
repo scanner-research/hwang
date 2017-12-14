@@ -64,9 +64,8 @@ if [[ $INSTALL_FFMPEG == true ]]; then
     ./configure --prefix=$DIR/thirdparty/install --extra-version=0ubuntu0.16.04.1 \
                 --toolchain=hardened --cc=cc --cxx=g++ --enable-gpl \
                 --enable-shared --disable-stripping \
-                --disable-decoder=libopenjpeg --disable-decoder=libschroedinger \
-                --enable-avresample --enable-libopenjpeg --enable-libxvid \
-                --enable-libx264 --enable-nonfree && \
+                --disable-decoder=libschroedinger \
+                --enable-avresample --enable-libx264 --enable-nonfree && \
     make install -j${cores}
     echo "Done installing ffmpeg 3.3.1"
 fi
