@@ -54,7 +54,7 @@ inline FullBox parse_box(GetBitsState& bs) {
   b.size = get_bits(bs, 32);
   b.type = get_bits(bs, 32);
   if (b.size == 1) {
-    b.size == get_bits(bs, 64);
+    b.size = get_bits(bs, 64);
   }
   if (b.type == string_to_type("uuid")) {
     // Skip 128 bits
@@ -74,7 +74,7 @@ inline FullBox probe_box_type(const GetBitsState& bs) {
   b.type = get_bits(bs2, 32);
 
   if (b.size == 1) {
-    b.size == get_bits(bs2, 64);
+    b.size = get_bits(bs2, 64);
   }
   if (b.type == string_to_type("uuid")) {
     // Skip 128 bits
