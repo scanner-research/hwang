@@ -14,7 +14,7 @@
 #include "hwang/video_decoder_factory.h"
 
 #ifdef HAVE_NVIDIA_VIDEO_HARDWARE
-#include "scanner/util/cuda.h"
+#include "hwang/util/cuda.h"
 #include "hwang/impls/nvidia/nvidia_video_decoder.h"
 #endif
 

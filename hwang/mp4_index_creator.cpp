@@ -140,6 +140,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
     //        bs.size
     //        );
     assert(b.size != 0);
+    //printf("box type %s, size %lu\n", type_to_string(b.type).c_str(), b.size);
     if (!parsed_ftyp_ && b.type == type("ftyp")) {
       if (size_left() < b.size) {
         // Get more data since we don't have this entire box
@@ -148,6 +149,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
       FileTypeBox ftyp = parse_ftyp(bs);
       bool supporting = false;
       for (auto &c : ftyp.compatible_brands) {
+        //printf("brand: %s\n", type_to_string(c).c_str());
         if (c == string_to_type("isom") || c == string_to_type("iso2") ||
             c == string_to_type("avc1")) {
           supporting = true;
@@ -696,6 +698,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
       // Jump to start of next box
       offset_ += b.size;
+      //printf("size %lu\n", b.size);
 
       MORE_DATA_LIMIT(offset_, 1024);
     }

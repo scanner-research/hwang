@@ -78,6 +78,10 @@ SoftwareVideoDecoder::SoftwareVideoDecoder(int32_t device_id,
 }
 
 SoftwareVideoDecoder::~SoftwareVideoDecoder() {
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(55, 53, 0)
   avcodec_free_context(&cc_);
 #else

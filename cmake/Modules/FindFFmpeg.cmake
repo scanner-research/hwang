@@ -28,7 +28,7 @@ else (FFMPEG_LIBRARIES AND FFMPEG_INCLUDE_DIR)
   # in the FIND_PATH() and FIND_LIBRARY() calls
   find_package(PkgConfig)
   set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH ON)
-  set(CMAKE_PREFIX_PATH ${LOCAL_PKGCONFIG})
+  list(APPEND CMAKE_PREFIX_PATH ${LOCAL_PKGCONFIG})
   if (PKG_CONFIG_FOUND)
     pkg_check_modules(_FFMPEG_AVCODEC libavcodec)
     pkg_check_modules(_FFMPEG_AVFORMAT libavformat)

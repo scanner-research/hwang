@@ -8,11 +8,13 @@ set(SOURCE_FILES
   video_decoder_factory.cpp
   hwang_python.cpp)
 
-# if (BUILD_CUDA)
-#   add_definitions(-DHAVE_NVIDIA_VIDEO_HARDWARE)
-#   list(APPEND SOURCE_FILES
-#     nvidia/nvidia_video_decoder.cpp)
-# endif()
+if (BUILD_CUDA)
+  add_definitions(-DHAVE_NVIDIA_VIDEO_HARDWARE)
+  list(APPEND SOURCE_FILES
+    impls/nvidia/nvidia_video_decoder.cpp)
+  cuda_add_library(util_cuda
+    impls/nvidia/convert.cu)
+endif()
 
 # if (MFX_FOUND)
 #   add_definitions(-DHAVE_INTEL_VIDEO_HARDWARE)
@@ -23,6 +25,7 @@ set(SOURCE_FILES
 list(APPEND SOURCE_FILES
   impls/software/software_video_decoder.cpp)
 
+message(${SOURCE_FILES})
 add_library(hwang_source OBJECT
   ${SOURCE_FILES})
 

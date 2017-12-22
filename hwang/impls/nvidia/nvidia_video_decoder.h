@@ -15,35 +15,47 @@
 
 #pragma once
 
-#include "scanner/api/kernel.h"
-#include "scanner/util/common.h"
-#include "scanner/util/queue.h"
-#include "scanner/video/video_decoder.h"
+#include "hwang/common.h"
+#include "hwang/util/queue.h"
+#include "hwang/video_decoder_interface.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <nvcuvid.h>
 
-namespace scanner {
-namespace internal {
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavfilter/avfilter.h"
+#include "libavformat/avformat.h"
+#include "libavformat/avio.h"
+#include "libavutil/error.h"
+#include "libavutil/opt.h"
+#include "libavutil/pixdesc.h"
+#include "libswscale/swscale.h"
+}
+
+namespace hwang {
 
 ///////////////////////////////////////////////////////////////////////////////
 /// NVIDIAVideoDecoder
-class NVIDIAVideoDecoder : public VideoDecoder {
+class NVIDIAVideoDecoder : public VideoDecoderInterface {
  public:
   NVIDIAVideoDecoder(int device_id, DeviceType output_type,
                      CUcontext cuda_context);
 
   ~NVIDIAVideoDecoder();
 
-  void configure(const FrameInfo& metadata) override;
+  void configure(const FrameInfo &metadata,
+                 const std::vector<uint8_t>& extradata) override;
 
-  bool feed(const u8* encoded_buffer, size_t encoded_size,
+  bool feed(const uint8_t* encoded_buffer, size_t encoded_size,
+            bool keyframe,
             bool discontinuity = false) override;
 
   bool discard_frame() override;
 
-  bool get_frame(u8* decoded_buffer, size_t decoded_size) override;
+  bool get_frame(uint8_t* decoded_buffer, size_t decoded_size) override;
 
   int decoded_frames_buffered() override;
 
@@ -64,24 +76,28 @@ class NVIDIAVideoDecoder : public VideoDecoder {
   static const int max_output_frames_ = 32;
   static const int max_mapped_frames_ = 8;
   std::vector<cudaStream_t> streams_;
+  AVCodec* codec_;
+  AVCodecContext* cc_;
+  AVBitStreamFilterContext* annexb_;
 
-  i32 frame_width_;
-  i32 frame_height_;
-  std::vector<char> metadata_packets_;
+  int32_t frame_width_;
+  int32_t frame_height_;
+  std::vector<uint8_t> metadata_packets_;
   CUvideoparser parser_;
   CUvideodecoder decoder_;
 
-  i32 last_displayed_frame_;
-  volatile i32 frame_in_use_[max_output_frames_];
-  volatile i32 undisplayed_frames_[max_output_frames_];
-  volatile i32 invalid_frames_[max_output_frames_];
+  int32_t last_displayed_frame_;
+  volatile int32_t frame_in_use_[max_output_frames_];
+  volatile int32_t undisplayed_frames_[max_output_frames_];
+  volatile int32_t invalid_frames_[max_output_frames_];
 
   std::mutex frame_queue_mutex_;
   CUVIDPARSERDISPINFO frame_queue_[max_output_frames_];
-  i32 frame_queue_read_pos_;
-  i32 frame_queue_elements_;
+  int32_t frame_queue_read_pos_;
+  int32_t frame_queue_elements_;
 
   CUdeviceptr mapped_frames_[max_mapped_frames_];
+  uint8_t* convert_frame_;
 };
-}
+
 }

@@ -2,7 +2,9 @@ from .libhwang import *
 import hwang
 
 class Decoder(object):
-    def __init__(self, f_or_path, video_index=None):
+    def __init__(self, f_or_path, video_index=None,
+                 device_type=DeviceType.CPU,
+                 device_id=0):
         if video_index is None:
             video_index = hwang.index_video(f_or_path)
         self.video_index = video_index
@@ -15,9 +17,12 @@ class Decoder(object):
 
         # Setup decoder
         handle = DeviceHandle()
-        handle.type = DeviceType.CPU
-        handle.id = 0
-        self._decoder = DecoderAutomata(handle, 1, VideoDecoderType.SOFTWARE)
+        handle.type = device_type
+        handle.id = device_id
+        decoder_type = VideoDecoderType.SOFTWARE
+        if device_type == DeviceType.GPU:
+            decoder_type = VideoDecoderType.NVIDIA
+        self._decoder = DecoderAutomata(handle, 1, decoder_type)
 
     def retrieve(self, rows):
         # Grab video index intervals

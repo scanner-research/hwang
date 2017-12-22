@@ -46,10 +46,10 @@ using storehouse::RandomReadFile;
 namespace scanner {
 namespace internal {
 
-H264ByteStreamIndexCreator::H264ByteStreamIndexCreator(WriteFile* b)
+AnnexBMetadataExtractor::AnnexBMetadataExtractor(WriteFile* b)
   : demuxed_bytestream_(b) {}
 
-bool H264ByteStreamIndexCreator::feed_packet(u8* data, size_t size) {
+bool AnnexBMetadataExtractor::feed_packet(u8* data, size_t size) {
   u8* orig_data = data;
   i32 orig_size = size;
 

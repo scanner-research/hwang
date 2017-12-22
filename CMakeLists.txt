@@ -66,6 +66,21 @@ endif()
 
 ###### Required Dependencies #######
 #find_package(SaneProtobuf REQUIRED)
+###### Parse dependency file #######
+file(STRINGS ${CMAKE_SOURCE_DIR}/dependencies.txt ConfigContents)
+foreach(NameAndValue ${ConfigContents})
+  # Strip leading spaces
+  string(REGEX REPLACE "^[ ]+" "" NameAndValue ${NameAndValue})
+  # Find variable name
+  string(REGEX MATCH "^[^=]+" Name ${NameAndValue})
+  # Find the value
+  string(REPLACE "${Name}=" "" Value ${NameAndValue})
+  # Set the variable
+  set(${Name} "${Value}")
+endforeach()
+
+list(APPEND CMAKE_PREFIX_PATH ${FFMPEG_DIR})
+
 find_package(FFmpeg REQUIRED)
 find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
 find_package(GFlags REQUIRED)

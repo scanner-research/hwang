@@ -13,12 +13,10 @@
  * limitations under the License.
  */
 
-#include "scanner/video/nvidia/nvidia_video_decoder.h"
-#include "scanner/util/cuda.h"
-#include "scanner/util/image.h"
-#include "scanner/util/queue.h"
-
-#include "storehouse/storage_backend.h"
+#include "hwang/impls/nvidia/nvidia_video_decoder.h"
+#include "hwang/impls/nvidia/convert.h"
+#include "hwang/util/cuda.h"
+#include "hwang/util/queue.h"
 
 #include <cassert>
 #include <thread>
@@ -26,8 +24,24 @@
 #include <cuda.h>
 #include <nvcuvid.h>
 
-namespace scanner {
-namespace internal {
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+#include "libavutil/error.h"
+#include "libavutil/frame.h"
+#include "libavutil/imgutils.h"
+#include "libavutil/opt.h"
+#include "libswscale/swscale.h"
+}
+
+namespace hwang {
+
+namespace {
+// Dummy until we add back the profiler
+int32_t now() {
+  return 0;
+}
+}
 
 NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
                                        CUcontext cuda_context)
@@ -40,6 +54,31 @@ NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
     frame_queue_read_pos_(0),
     frame_queue_elements_(0),
     last_displayed_frame_(-1) {
+  // FOR BITSTREAM FILTERING
+  avcodec_register_all();
+
+  codec_ = avcodec_find_decoder(AV_CODEC_ID_H264);
+  if (!codec_) {
+    fprintf(stderr, "could not find h264 decoder\n");
+    exit(EXIT_FAILURE);
+  }
+
+  cc_ = avcodec_alloc_context3(codec_);
+  if (!cc_) {
+    fprintf(stderr, "could not alloc codec context");
+    exit(EXIT_FAILURE);
+  }
+
+  // cc_->thread_count = thread_count;
+  cc_->thread_count = 4;
+
+  if (avcodec_open2(cc_, codec_, NULL) < 0) {
+    fprintf(stderr, "could not open codec\n");
+    assert(false);
+  }
+  annexb_ = nullptr;
+  // FOR BITSTREAM FILTERING
+
   CUcontext dummy;
 
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
@@ -49,7 +88,7 @@ NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
     cudaStreamCreate(&streams_[i]);
     mapped_frames_[i] = 0;
   }
-  for (i32 i = 0; i < max_output_frames_; ++i) {
+  for (int32_t i = 0; i < max_output_frames_; ++i) {
     frame_in_use_[i] = false;
     undisplayed_frames_[i] = false;
     invalid_frames_[i] = false;
@@ -57,9 +96,17 @@ NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
 
   CUD_CHECK(cuCtxPopCurrent(&dummy));
 
+  annexb_ = nullptr;
 }
 
 NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(55, 53, 0)
+  avcodec_free_context(&cc_);
+#else
+  avcodec_close(cc_);
+  av_freep(&cc_);
+#endif
+
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
   cudaSetDevice(device_id_);
 
@@ -81,6 +128,10 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
     CU_CHECK(cudaStreamDestroy(streams_[i]));
   }
 
+  if (convert_frame_ != nullptr) {
+    CU_CHECK(cudaFree(convert_frame_));
+  }
+
   CUcontext dummy;
   CUD_CHECK(cuCtxPopCurrent(&dummy));
   // HACK(apoms): We are only using the primary context right now instead of
@@ -90,9 +141,25 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
   CUD_CHECK(cuDevicePrimaryCtxRelease(device_id_));
 }
 
-void NVIDIAVideoDecoder::configure(const FrameInfo& metadata) {
-  frame_width_ = metadata.width();
-  frame_height_ = metadata.height();
+void NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
+                                   const std::vector<uint8_t>& extradata) {
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+  annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+
+  frame_width_ = metadata.width;
+  frame_height_ = metadata.height;
+  metadata_packets_ = extradata;
+
+  if (convert_frame_ != nullptr) {
+    CU_CHECK(cudaFree(convert_frame_));
+  }
+  CU_CHECK(cudaMalloc(&convert_frame_, frame_width_ * frame_height_ * 3));
+
+  cc_->extradata = (uint8_t *)malloc(metadata_packets_.size());
+  memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
+  cc_->extradata_size = metadata_packets_.size();
 
   CUcontext dummy;
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
@@ -115,7 +182,7 @@ void NVIDIAVideoDecoder::configure(const FrameInfo& metadata) {
   for (int i = 0; i < max_mapped_frames_; ++i) {
     mapped_frames_[i] = 0;
   }
-  for (i32 i = 0; i < max_output_frames_; ++i) {
+  for (int32_t i = 0; i < max_output_frames_; ++i) {
     frame_in_use_[i] = false;
     undisplayed_frames_[i] = false;
     invalid_frames_[i] = false;
@@ -166,18 +233,19 @@ void NVIDIAVideoDecoder::configure(const FrameInfo& metadata) {
   CUD_CHECK(cuCtxPopCurrent(&dummy));
 
   size_t pos = 0;
-  while (pos < metadata_packets_.size()) {
-    int encoded_packet_size =
-        *reinterpret_cast<int*>(metadata_packets_.data() + pos);
-    pos += sizeof(int);
-    u8* encoded_packet = (u8*)(metadata_packets_.data() + pos);
-    pos += encoded_packet_size;
+  // while (pos < metadata_packets_.size()) {
+  //   int encoded_packet_size =
+  //       *reinterpret_cast<int*>(metadata_packets_.data() + pos);
+  //   pos += sizeof(int);
+  //   uint8_t* encoded_packet = (uint8_t*)(metadata_packets_.data() + pos);
+  //   pos += encoded_packet_size;
 
-    feed(encoded_packet, encoded_packet_size);
-  }
+  //   feed(encoded_packet, encoded_packet_size);
+  // }
 }
 
-bool NVIDIAVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
+bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size,
+                              bool keyframe,
                               bool discontinuity) {
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
   cudaSetDevice(device_id_);
@@ -201,7 +269,7 @@ bool NVIDIAVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
     std::unique_lock<std::mutex> lock(frame_queue_mutex_);
     last_displayed_frame_ = -1;
     // Empty queue because we have a new section of frames
-    for (i32 i = 0; i < max_output_frames_; ++i) {
+    for (int32_t i = 0; i < max_output_frames_; ++i) {
       invalid_frames_[i] = undisplayed_frames_[i];
       undisplayed_frames_[i] = false;
     }
@@ -212,13 +280,43 @@ bool NVIDIAVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
       frame_queue_elements_--;
     }
 
+    // For bitstream filtering
+    if (annexb_) {
+      av_bitstream_filter_close(annexb_);
+    }
+
+    cc_->extradata = (uint8_t *)malloc(metadata_packets_.size());
+    memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
+    cc_->extradata_size = metadata_packets_.size();
+
+    annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+    // For bitstream filtering
+
     CUcontext dummy;
     CUD_CHECK(cuCtxPopCurrent(&dummy));
     return false;
   }
+
+  // BITSTREAM FILTERING
+  uint8_t *filtered_buffer = nullptr;
+  int32_t filtered_size = 0;
+  int err;
+  if (encoded_size > 0) {
+    err = av_bitstream_filter_filter(annexb_, cc_, NULL, &filtered_buffer,
+                                     &filtered_size, encoded_buffer,
+                                     encoded_size, keyframe);
+    if (err < 0) {
+      char err_msg[256];
+      av_strerror(err, err_msg, 256);
+      LOG(FATAL) << "Error while filtering frame (" +
+                        std::to_string(err) + "): " + std::string(err_msg);
+    }
+  }
+  // BITSTREAM FILTERING
+
   CUVIDSOURCEDATAPACKET cupkt = {};
-  cupkt.payload_size = encoded_size;
-  cupkt.payload = reinterpret_cast<const uint8_t*>(encoded_buffer);
+  cupkt.payload_size = filtered_size;
+  cupkt.payload = filtered_buffer;
   if (encoded_size == 0) {
     cupkt.flags |= CUVID_PKT_ENDOFSTREAM;
   }
@@ -227,20 +325,23 @@ bool NVIDIAVideoDecoder::feed(const u8* encoded_buffer, size_t encoded_size,
 
   // Feed metadata packets after EOS to reinit decoder
   if (encoded_size == 0) {
-    size_t pos = 0;
-    while (pos < metadata_packets_.size()) {
-      int encoded_packet_size =
-          *reinterpret_cast<int*>(metadata_packets_.data() + pos);
-      pos += sizeof(int);
-      u8* encoded_packet = (u8*)(metadata_packets_.data() + pos);
-      pos += encoded_packet_size;
-
-      feed(encoded_packet, encoded_packet_size);
+    if (annexb_) {
+      av_bitstream_filter_close(annexb_);
     }
+
+    cc_->extradata = (uint8_t *)malloc(metadata_packets_.size());
+    memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
+    cc_->extradata_size = metadata_packets_.size();
+
+    annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
   }
 
   CUcontext dummy;
   CUD_CHECK(cuCtxPopCurrent(&dummy));
+
+  if (filtered_buffer) {
+    free(filtered_buffer);
+  }
 
   return frame_queue_elements_ > 0;
 }
@@ -263,7 +364,7 @@ bool NVIDIAVideoDecoder::discard_frame() {
   return frame_queue_elements_ > 0;
 }
 
-bool NVIDIAVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
+bool NVIDIAVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_size) {
   auto start = now();
   std::unique_lock<std::mutex> lock(frame_queue_mutex_);
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
@@ -288,14 +389,15 @@ bool NVIDIAVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
     // cuvidMapVideoFrame does not wait for convert kernel to finish so sync
     // TODO(apoms): make this an event insertion and have the async 2d memcpy
     //              depend on the event
-    if (profiler_) {
-      profiler_->add_interval("map_frame", start_map, now());
-    }
+    // if (profiler_) {
+    //   profiler_->add_interval("map_frame", start_map, now());
+    // }
     CUdeviceptr mapped_frame = mapped_frames_[mapped_frame_index];
-    CU_CHECK(convertNV12toRGBA((const u8*)mapped_frame, pitch, decoded_buffer,
-                               frame_width_ * 3, frame_width_, frame_height_,
-                               0));
-    CU_CHECK(cudaDeviceSynchronize());
+    CU_CHECK(convertNV12toRGBA(reinterpret_cast<const uint8_t *>(mapped_frame),
+                               pitch, convert_frame_, frame_width_ * 3,
+                               frame_width_, frame_height_, 0));
+    CU_CHECK(cudaMemcpy(decoded_buffer, convert_frame_,
+                        frame_width_ * frame_height_ * 3, cudaMemcpyDefault));
 
     CUD_CHECK(
         cuvidUnmapVideoFrame(decoder_, mapped_frames_[mapped_frame_index]));
@@ -308,9 +410,9 @@ bool NVIDIAVideoDecoder::get_frame(u8* decoded_buffer, size_t decoded_size) {
   CUcontext dummy;
   CUD_CHECK(cuCtxPopCurrent(&dummy));
 
-  if (profiler_) {
-    profiler_->add_interval("get_frame", start, now());
-  }
+  // if (profiler_) {
+  //   profiler_->add_interval("get_frame", start, now());
+  // }
 
   return frame_queue_elements_;
 }
@@ -373,5 +475,5 @@ int NVIDIAVideoDecoder::cuvid_handle_picture_display(
   decoder.undisplayed_frames_[dispinfo->picture_index] = false;
   return true;
 }
-}
+
 }
