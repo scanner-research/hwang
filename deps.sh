@@ -81,6 +81,19 @@ export PKG_CONFIG_PATH=$INSTALL_PREFIX/lib/pkgconfig:$PGK_CONFIG_PATH
 mkdir -p $BUILD_DIR
 mkdir -p $INSTALL_PREFIX
 
+if [[ ! -z ${WITH_FFMPEG+x} ]]; then
+    INSTALL_FFMPEG=false
+    FFMPEG_DIR=$WITH_FFMPEG
+fi
+if [[ ! -z ${WITH_BOOST+x} ]]; then
+    INSTALL_BOOST=false
+    BOOST_DIR=$WITH_BOOST
+fi
+if [[ ! -z ${WITH_PROTOBUF+x} ]]; then
+    INSTALL_PROTOBUF=false
+    PROTOBUF_DIR=$WITH_PROTOBUF
+fi
+
 if [[ $INSTALL_ALL == false ]]; then
     # Ask about each library
     if [[ -z ${WITH_FFMPEG+x} ]]; then
@@ -98,9 +111,6 @@ if [[ $INSTALL_ALL == false ]]; then
         else
             INSTALL_FFMPEG=true
         fi
-    else
-        INSTALL_FFMPEG=false
-        FFMPEG_DIR=$WITH_FFMPEG
     fi
     if [[ -z ${WITH_BOOST+x} ]]; then
         echo -n "Do you have boost>=1.63 installed? [y/N]: "
@@ -117,9 +127,6 @@ if [[ $INSTALL_ALL == false ]]; then
         else
             INSTALL_BOOST=true
         fi
-    else
-        INSTALL_BOOST=false
-        BOOST_DIR=$WITH_BOOST
     fi
     if [[ -z ${WITH_PROTOBUF+x} ]]; then
         echo -n "Do you have protobuf>=3.40 installed? [y/N]: "
@@ -136,9 +143,6 @@ if [[ $INSTALL_ALL == false ]]; then
         else
             INSTALL_PROTOBUF=true
         fi
-    else
-        INSTALL_PROTOBUF=false
-        PROTOBUF_DIR=$WITH_PROTOBUF
     fi
 fi
 

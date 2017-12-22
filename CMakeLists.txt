@@ -136,7 +136,7 @@ if (BUILD_CUDA)
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11")
   endif()
 
-  # Include nvidia decoder library 
+  # Include nvidia decoder library
   list(APPEND HWANG_LIBRARIES
     util_cuda
     "${CUDA_LIBRARIES}"
@@ -198,7 +198,43 @@ target_link_libraries(hwang PUBLIC
   ${HWANG_LIBRARIES}
   ${PLATFORM_LINK_FLAGS})
 
+set(PUBLIC_HEADER_FILES
+  hwang/common.h
+  hwang/video_decoder_interface.h
+  hwang/video_decoder_factory.h
+  hwang/video_index.h)
+
 set(PYDIR ${CMAKE_CURRENT_BINARY_DIR})
+
+# Install commands
+MACRO(INSTALL_HEADERS_WITH_DIRECTORY HEADER_LIST)
+
+FOREACH(HEADER ${${HEADER_LIST}})
+STRING(REGEX MATCH "(.*)[/\\]" DIR ${HEADER})
+INSTALL(FILES ${HEADER} DESTINATION include/${DIR})
+ENDFOREACH(HEADER)
+
+ENDMACRO(INSTALL_HEADERS_WITH_DIRECTORY)
+
+install(TARGETS hwang
+  EXPORT HwangTarget
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib)
+
+set(HWANG_LIBRARY "libhwang.so")
+
+set(HWANG_LIBRARY "${CMAKE_INSTALL_PREFIX}/lib/${HWANG_LIBRARY}")
+
+configure_file(cmake/HwangConfig.cmake.in
+  "${PROJECT_BINARY_DIR}/cmake/HwangConfig.cmake" @ONLY)
+
+install(FILES "${PROJECT_BINARY_DIR}/cmake/HwangConfig.cmake"
+  DESTINATION cmake)
+
+install_headers_with_directory(PUBLIC_HEADER_FILES)
+
+install(EXPORT HwangTarget
+  DESTINATION cmake)
 
 # Make init files so python code can import from subdirectories
 # foreach(FIL ${PROTO_FILES} ${GRPC_PROTO_FILES})

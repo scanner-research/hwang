@@ -14,6 +14,10 @@ if (BUILD_CUDA)
     impls/nvidia/nvidia_video_decoder.cpp)
   cuda_add_library(util_cuda
     impls/nvidia/convert.cu)
+  install(TARGETS util_cuda
+    EXPORT HwangTarget
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib)
 endif()
 
 # if (MFX_FOUND)
