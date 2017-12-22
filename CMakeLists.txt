@@ -138,7 +138,7 @@ if (BUILD_CUDA)
 
   # Include nvidia decoder library
   list(APPEND HWANG_LIBRARIES
-    util_cuda
+    hwang_util_cuda
     "${CUDA_LIBRARIES}"
     "/usr/lib/x86_64-linux-gnu/libnvcuvid.so"
     "-lcuda")

@@ -60,7 +60,7 @@ esac
 done
 
 echo "--------------------------------------------------------------"
-echo "|            Hwang Dependency Installation Script             |"
+echo "|            Hwang Dependency Installation Script            |"
 echo "--------------------------------------------------------------"
 echo "The script will ask if required dependencies are installed and"
 echo "then install missing dependencies to "

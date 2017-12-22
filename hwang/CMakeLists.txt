@@ -12,9 +12,9 @@ if (BUILD_CUDA)
   add_definitions(-DHAVE_NVIDIA_VIDEO_HARDWARE)
   list(APPEND SOURCE_FILES
     impls/nvidia/nvidia_video_decoder.cpp)
-  cuda_add_library(util_cuda
+  cuda_add_library(hwang_util_cuda
     impls/nvidia/convert.cu)
-  install(TARGETS util_cuda
+  install(TARGETS hwang_util_cuda
     EXPORT HwangTarget
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib)
