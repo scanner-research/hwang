@@ -12,6 +12,7 @@ POSITIONAL=()
 # Ask if installed
 INSTALL_BOOST=true
 INSTALL_FFMPEG=true
+INSTALL_PROTOBUF=true
 
 INSTALL_PREFIX=$DEFAULT_INSTALL_DIR
 
@@ -46,6 +47,11 @@ case $key in
         shift # past arg
         shift # past value
         ;;
+    --with-protobuf)
+        WITH_PROTOBUF="$2"
+        shift # past arg
+        shift # past value
+        ;;
     *)    # unknown option
         POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -53,7 +59,24 @@ case $key in
 esac
 done
 
+echo "--------------------------------------------------------------"
+echo "|            Hwang Dependency Installation Script             |"
+echo "--------------------------------------------------------------"
+echo "The script will ask if required dependencies are installed and"
+echo "then install missing dependencies to "
+echo "$INSTALL_PREFIX"
+echo "(customized by specifying (--prefix <dir>)"
+
 set -- "${POSITIONAL[@]}" # restore positional parameters
+
+BOOST_DIR=$INSTALL_PREFIX
+FFMPEG_DIR=$INSTALL_PREFIX
+PROTOBUF_DIR=$INSTALL_PREFIX
+
+export C_INCLUDE_PATH=$INSTALL_PREFIX/include:$C_INCLUDE_PATH
+export LD_LIBRARY_PATH=$INSTALL_PREFIX/lib:$LD_LIBRARY_PATH
+export PATH=$INSTALL_PREFIX/bin:$PATH
+export PKG_CONFIG_PATH=$INSTALL_PREFIX/lib/pkgconfig:$PGK_CONFIG_PATH
 
 mkdir -p $BUILD_DIR
 mkdir -p $INSTALL_PREFIX
@@ -65,10 +88,15 @@ if [[ $INSTALL_ALL == false ]]; then
         read yn
         if [[ $yn == y ]] || [[ $yn == Y ]]; then
             INSTALL_FFMPEG=false
-            break
+            echo -n "Where is your ffmpeg install? [/usr/local]: "
+            read install_location
+            if [[ $install_location == "" ]]; then
+                FFMPEG_DIR=/usr/local
+            else
+                FFMPEG_DIR=$install_location
+            fi
         else
             INSTALL_FFMPEG=true
-            break
         fi
     else
         INSTALL_FFMPEG=false
@@ -79,14 +107,38 @@ if [[ $INSTALL_ALL == false ]]; then
         read yn
         if [[ $yn == y ]] || [[ $yn == Y ]]; then
             INSTALL_BOOST=false
-            break
+            echo -n "Where is your boost install? [/usr/local]: "
+            read install_location
+            if [[ $install_location == "" ]]; then
+                BOOST_DIR=/usr/local
+            else
+                BOOST_DIR=$install_location
+            fi
         else
             INSTALL_BOOST=true
-            break
         fi
     else
         INSTALL_BOOST=false
         BOOST_DIR=$WITH_BOOST
+    fi
+    if [[ -z ${WITH_PROTOBUF+x} ]]; then
+        echo -n "Do you have protobuf>=3.40 installed? [y/N]: "
+        read yn
+        if [[ $yn == y ]] || [[ $yn == Y ]]; then
+            INSTALL_PROTOBUF=false
+            echo -n "Where is your protobuf install? [/usr/local]: "
+            read install_location
+            if [[ $install_location == "" ]]; then
+                PROTOBUF_DIR=/usr/local
+            else
+                PROTOBUF_DIR=$install_location
+            fi
+        else
+            INSTALL_PROTOBUF=true
+        fi
+    else
+        INSTALL_PROTOBUF=false
+        PROTOBUF_DIR=$WITH_PROTOBUF
     fi
 fi
 
@@ -116,6 +168,19 @@ if [[ $INSTALL_BOOST == true ]]; then
     echo "Done installing boost 1.63.0"
 fi
 
+if [[ $INSTALL_PROTOBUF == true ]] && [[ ! -f $BUILD_DIR/protobuf.done ]] ; then
+    # protobuf 3.4.1
+    echo "Installing protobuf 3.4.1..."
+    cd $BUILD_DIR
+    rm -fr protobuf
+    git clone -b v3.4.1 https://github.com/google/protobuf.git && \
+        cd protobuf && bash ./autogen.sh && \
+        ./configure --prefix=$INSTALL_PREFIX && make -j$cores && \
+        make install && touch $BUILD_DIR/protobuf.done \
+            || { echo 'Installing protobuf failed!' ; exit 1; }
+    echo "Done installing protobuf 3.4.1"
+fi
+
 echo "Installing googletest..."
 cd $BUILD_DIR
 rm -fr googletest
@@ -127,8 +192,9 @@ echo "Done installing googletest"
 
 DEP_FILE=$LOCAL_DIR/dependencies.txt
 rm -f $DEP_FILE
-echo "BOOST_ROOT=$BOOST_DIR" >> $DEP_FILE
+echo "BOOST_DIR=$BOOST_DIR" >> $DEP_FILE
 echo "FFMPEG_DIR=$FFMPEG_DIR" >> $DEP_FILE
+echo "PROTOBUF_DIR=$PROTOBUF_DIR" >> $DEP_FILE
 
 echo "Done installing required dependencies!"
 echo "Add $INSTALL_PREFIX/lib to your LD_LIBRARY_PATH so the installed "

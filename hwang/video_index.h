@@ -27,17 +27,16 @@ class VideoIndex {
              const std::vector<uint64_t> &sample_sizes,
              const std::vector<uint64_t> &keyframe_indices,
              const std::vector<uint8_t> &metadata)
-      : frame_width_(width), frame_height_(height), num_frames_(sample_sizes.size()),
-        sample_offsets_(sample_offsets), sample_sizes_(sample_sizes),
-        keyframe_indices_(keyframe_indices), metadata_bytes_(metadata){};
+      : frame_width_(width), frame_height_(height),
+        num_frames_(sample_sizes.size()), sample_offsets_(sample_offsets),
+        sample_sizes_(sample_sizes), keyframe_indices_(keyframe_indices),
+        metadata_bytes_(metadata){};
 
-  static VideoIndex deserialize(const std::vector<uint8_t>& data);
+  static VideoIndex deserialize(const std::vector<uint8_t> &data);
 
   std::vector<uint8_t> serialize() const;
 
-  const std::vector<uint64_t> &sample_sizes() const {
-    return sample_sizes_;
-  }
+  const std::vector<uint64_t> &sample_sizes() const { return sample_sizes_; }
 
   const std::vector<uint64_t> &sample_offsets() const {
     return sample_offsets_;

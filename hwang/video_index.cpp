@@ -12,7 +12,7 @@
  */
 
 #include "hwang/video_index.h"
-//#include "hwang/descriptors.pb.h"
+#include "hwang/descriptors.pb.h"
 
 #include <string>
 #include <vector>
@@ -22,16 +22,35 @@
 namespace hwang {
 
 VideoIndex VideoIndex::deserialize(const std::vector<uint8_t> &data) {
-  // proto::VideoIndex desc;
-  // desc.ParseFromArray(data.data(), data.size());
-  return VideoIndex();
+  proto::VideoIndex desc;
+  desc.ParseFromArray(data.data(), data.size());
+  return VideoIndex(desc.frame_width(), desc.frame_height(),
+                    std::vector<uint64_t>(desc.sample_offsets().begin(),
+                                          desc.sample_offsets().end()),
+                    std::vector<uint64_t>(desc.sample_sizes().begin(),
+                                          desc.sample_sizes().end()),
+                    std::vector<uint64_t>(desc.keyframe_indices().begin(),
+                                          desc.keyframe_indices().end()),
+                    std::vector<uint8_t>(desc.metadata_bytes().begin(),
+                                         desc.metadata_bytes().end()));
 }
 
 std::vector<uint8_t> VideoIndex::serialize() const {
-  std::vector<uint8_t> data;
-  // proto::VideoIndex desc;
-  // std::vector<uint8_t> data(desc.ByteSizeLong());
-  // desc.SerializeToArray(data.data(), data.size());
+  proto::VideoIndex desc;
+  desc.set_frame_width(frame_width_);
+  desc.set_frame_height(frame_height_);
+  for (uint64_t s : sample_offsets_) {
+    desc.add_sample_offsets(s);
+  }
+  for (uint64_t s : sample_sizes_) {
+    desc.add_sample_sizes(s);
+  }
+  for (uint64_t k : keyframe_indices_) {
+    desc.add_keyframe_indices(k);
+  }
+  desc.set_metadata_bytes(metadata_bytes_.data(), metadata_bytes_.size());
+  std::vector<uint8_t> data(desc.ByteSizeLong());
+  desc.SerializeToArray(data.data(), data.size());
   return data;
 }
 
