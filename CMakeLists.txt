@@ -200,6 +200,8 @@ target_link_libraries(hwang PUBLIC
 
 set(PUBLIC_HEADER_FILES
   hwang/common.h
+  hwang/mp4_index_creator.h
+  hwang/decoder_automata.h
   hwang/video_decoder_interface.h
   hwang/video_decoder_factory.h
   hwang/video_index.h)
