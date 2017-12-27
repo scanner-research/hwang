@@ -143,6 +143,7 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
 
 void NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
                                    const std::vector<uint8_t>& extradata) {
+  cudaSetDevice(device_id_);
   if (annexb_) {
     av_bitstream_filter_close(annexb_);
   }
