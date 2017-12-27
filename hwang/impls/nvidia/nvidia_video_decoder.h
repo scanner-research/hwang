@@ -97,7 +97,7 @@ class NVIDIAVideoDecoder : public VideoDecoderInterface {
   int32_t frame_queue_elements_;
 
   CUdeviceptr mapped_frames_[max_mapped_frames_];
-  uint8_t* convert_frame_;
+  uint8_t* convert_frame_ = nullptr;
 };
 
 }
