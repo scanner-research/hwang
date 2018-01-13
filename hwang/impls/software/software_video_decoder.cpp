@@ -166,49 +166,22 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
       AVBSFContext *priv_ctx = (AVBSFContext *)priv->ctx;
       H264BSFContext *s = (H264BSFContext *)priv_ctx->priv_data;
 
-      bool insert_extradata = false;
+      uint8_t *extra_buffer = priv_ctx->par_out->extradata;
+      size_t extra_size = priv_ctx->par_out->extradata_size;
 
-      uint64_t cumul_size = 0;
-      uint64_t buf_size = encoded_size;
-      uint8_t *buf = const_cast<uint8_t *>(encoded_buffer);
-      do {
-        int32_t i = 0;
-        int32_t nal_size;
-        for (nal_size = 0, i = 0; i < s->length_size; i++) {
-          nal_size = (nal_size << 8) | buf[i];
-        }
+      int32_t temp_size = filtered_size + extra_size + 3;
+      uint8_t *temp_buffer = (uint8_t *)malloc(temp_size);
 
-        buf += s->length_size;
-        uint8_t unit_type = *buf & 0x1f;
+      temp_buffer[0] = 0;
+      temp_buffer[1] = 0;
+      temp_buffer[2] = 1;
+      memcpy(temp_buffer + 3, extra_buffer, extra_size);
+      memcpy(temp_buffer + 3 + extra_size, filtered_buffer, filtered_size);
 
-        if (unit_type == 1) {
-          // We need to insert the extradata
-          insert_extradata = true;
-        }
-
-        buf += nal_size;
-        cumul_size += nal_size + s->length_size;
-      } while (cumul_size < buf_size);
-
-      if (insert_extradata) {
-        uint8_t *extra_buffer = priv_ctx->par_out->extradata;
-        size_t extra_size = priv_ctx->par_out->extradata_size;
-
-        int32_t temp_size = filtered_size + extra_size + 3;
-        uint8_t *temp_buffer = (uint8_t*)malloc(temp_size);
-
-        temp_buffer[0] = 0;
-        temp_buffer[1] = 0;
-        temp_buffer[2] = 1;
-        memcpy(temp_buffer + 3, extra_buffer, extra_size);
-        memcpy(temp_buffer + 3 + extra_size, filtered_buffer, filtered_size);
-
-        free(filtered_buffer);
-        filtered_buffer = temp_buffer;
-        filtered_size = temp_size;
-      }
+      free(filtered_buffer);
+      filtered_buffer = temp_buffer;
+      filtered_size = temp_size;
     }
-
   }
 
 // Debug read packets

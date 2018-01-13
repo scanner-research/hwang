@@ -440,7 +440,10 @@ TEST(DecoderAutomata, GetStridedRangesFramesGPU) {
     std::vector<uint8_t> frame_buffer(video_index.frame_width() *
                                       video_index.frame_height() * 3 *
                                       arg.valid_frames.size());
-    decoder->get_frames(frame_buffer.data(), arg.valid_frames.size());
+    for (int i = 0; i < arg.valid_frames.size(); i += 8) {
+      int num_frames = std::min((size_t)8, arg.valid_frames.size() - i);
+      decoder->get_frames(frame_buffer.data(), num_frames);
+    }
   }
 
   delete decoder;

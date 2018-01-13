@@ -107,22 +107,32 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
     wake_feeder_.wait(lk, [this] { return feeder_waiting_.load(); });
   }
 
-  if (encoded_data_.size() > feeder_data_idx_) {
-    // Make sure to not feed seek packet if we reached end of stream
-    if (seeking_) {
-      decoder_->feed(nullptr, 0, false, true);
-      seeking_ = false;
+  // We don't want to send discontinuity packet and flush until we know
+  // we have exhausted this decode args group
+  if (encoded_data_.size() > retriever_valid_idx_) {
+    const auto &valid_frames = encoded_data_[retriever_data_idx_].valid_frames;
+    // If we are at the end of a segment or if the retriever and the feeder
+    // are working on the same segment
+    if (retriever_valid_idx_ == valid_frames.size() ||
+        retriever_data_idx_ == feeder_data_idx_) {
+      // Make sure to not feed seek packet if we reached end of stream
+      if (encoded_data_.size() > feeder_data_idx_) {
+        if (seeking_) {
+          decoder_->feed(nullptr, 0, false, true);
+          seeking_ = false;
+        }
+      }
+
+      // Start up feeder thread
+      {
+        std::unique_lock<std::mutex> lk(feeder_mutex_);
+        frames_retrieved_ = 0;
+        frames_to_get_ = num_frames;
+        feeder_waiting_ = false;
+      }
+      wake_feeder_.notify_one();
     }
   }
-
-  // Start up feeder thread
-  {
-    std::unique_lock<std::mutex> lk(feeder_mutex_);
-    frames_retrieved_ = 0;
-    frames_to_get_ = num_frames;
-    feeder_waiting_ = false;
-  }
-  wake_feeder_.notify_one();
 
   // if (profiler_) {
   //   profiler_->add_interval("get_frames_wait", start, now());
