@@ -174,6 +174,9 @@ void NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
   }
   CU_CHECK(cudaMalloc(&convert_frame_, frame_width_ * frame_height_ * 3));
 
+  if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+    free(cc_->extradata);
+  }
   cc_->extradata = (uint8_t *)malloc(metadata_packets_.size() +
                                      AV_INPUT_BUFFER_PADDING_SIZE);
   memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
@@ -303,6 +306,9 @@ bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size
       av_bitstream_filter_close(annexb_);
     }
 
+    if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+      free(cc_->extradata);
+    }
     cc_->extradata = (uint8_t *)malloc(metadata_packets_.size() +
                                        AV_INPUT_BUFFER_PADDING_SIZE);
     memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
@@ -372,6 +378,9 @@ bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size
       av_bitstream_filter_close(annexb_);
     }
 
+    if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+      free(cc_->extradata);
+    }
     cc_->extradata = (uint8_t *)malloc(metadata_packets_.size() +
                                        AV_INPUT_BUFFER_PADDING_SIZE);
     memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());

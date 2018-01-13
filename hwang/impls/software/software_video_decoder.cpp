@@ -137,6 +137,9 @@ void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
   extradata_ = extradata;
   extradata_.resize(extradata.size() + AV_INPUT_BUFFER_PADDING_SIZE);
 
+  if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+    free(cc_->extradata);
+  }
   cc_->extradata = (uint8_t*)malloc(extradata_.size());
   memcpy(cc_->extradata, extradata_.data(), extradata_.size());
   cc_->extradata_size = extradata_.size();
@@ -232,6 +235,9 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
       av_bitstream_filter_close(annexb_);
     }
 
+    if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+      free(cc_->extradata);
+    }
     cc_->extradata = (uint8_t *)malloc(extradata_.size());
     memcpy(cc_->extradata, extradata_.data(), extradata_.size());
     cc_->extradata_size = extradata_.size();
