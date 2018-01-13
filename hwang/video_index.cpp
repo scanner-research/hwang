@@ -57,7 +57,7 @@ std::vector<uint8_t> VideoIndex::serialize() const {
 VideoIntervals slice_into_video_intervals(const VideoIndex &index,
                                           const std::vector<uint64_t> &rows) {
   auto keyframe_positions = index.keyframe_indices();
-  keyframe_positions.push_back(index.frames() - 1);
+  keyframe_positions.push_back(index.frames());
   VideoIntervals info;
   assert(keyframe_positions.size() >= 2);
   size_t start_keyframe_index = 0;
