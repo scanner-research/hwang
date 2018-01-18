@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include "hwang/impls/nvidia/convert.h"
+
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
@@ -87,22 +89,16 @@ namespace
                 (chromaCr * constHueColorSpaceMat[8]);
     }
 
-    __device__ static uint RGBA_pack_10bit(float red, float green, float blue, uint alpha)
-    {
-        uint ARGBpixel = 0;
+    __device__ static void RGB_pack_10bit(float red, float green, float blue,
+                                          uint8_t* rgb) {
+      // Clamp final 10 bit results
+      red = ::fmin(::fmax(red, 0.0f), 1023.f);
+      green = ::fmin(::fmax(green, 0.0f), 1023.f);
+      blue = ::fmin(::fmax(blue, 0.0f), 1023.f);
 
-        // Clamp final 10 bit results
-        red   = ::fmin(::fmax(red,   0.0f), 1023.f);
-        green = ::fmin(::fmax(green, 0.0f), 1023.f);
-        blue  = ::fmin(::fmax(blue,  0.0f), 1023.f);
-
-        // Convert to 8 bit unsigned integers per color component
-        ARGBpixel = (((uint)blue  >> 2) |
-                    (((uint)green >> 2) << 8)  |
-                    (((uint)red   >> 2) << 16) |
-                    (uint)alpha);
-
-        return ARGBpixel;
+      rgb[0] = ((uint)red) >> 2;
+      rgb[1] = ((uint)green) >> 2;
+      rgb[2] = ((uint)blue) >> 2;
     }
 
     // CUDA kernel for outputing the final ARGB output from NV12
@@ -110,77 +106,97 @@ namespace
     #define COLOR_COMPONENT_BIT_SIZE 10
     #define COLOR_COMPONENT_MASK     0x3FF
 
-    __global__ void NV12_to_RGB(const uint8_t* srcImage, size_t nSourcePitch,
-                                  uint32_t* dstImage, size_t nDestPitch,
-                                  uint32_t width, uint32_t height)
-    {
-        // Pad borders with duplicate pixels, and we multiply by 2 because we process 2 pixels per thread
-        const int x = blockIdx.x * (blockDim.x << 1) + (threadIdx.x << 1);
-        const int y = blockIdx.y *  blockDim.y       +  threadIdx.y;
+    __global__ void NV12_to_RGB(const uint8_t *srcImage, size_t nSourcePitch,
+                                uint8_t *dstImage, size_t nDestPitch, uint width,
+                                uint height) {
+      // Pad borders with duplicate pixels, and we multiply by 2 because we
+      // process 2 pixels per thread
+      const int x = blockIdx.x * (blockDim.x << 1) + (threadIdx.x << 1);
+      const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-        if (x >= width || y >= height)
-            return;
+      if (x >= width || y >= height)
+        return;
 
-        // Read 2 Luma components at a time, so we don't waste processing since CbCr are decimated this way.
-        // if we move to texture we could read 4 luminance values
+      // Read 2 Luma components at a time, so we don't waste processing since
+      // CbCr are decimated this way.
+      // if we move to texture we could read 4 luminance values
 
-        uint yuv101010Pel[2];
+      uint yuv101010Pel[2];
 
-        yuv101010Pel[0] = (srcImage[y * nSourcePitch + x    ]) << 2;
-        yuv101010Pel[1] = (srcImage[y * nSourcePitch + x + 1]) << 2;
+      yuv101010Pel[0] = (srcImage[y * nSourcePitch + x]) << 2;
+      yuv101010Pel[1] = (srcImage[y * nSourcePitch + x + 1]) << 2;
 
-        const size_t chromaOffset = nSourcePitch * height;
+      const size_t chromaOffset = nSourcePitch * height;
 
-        const int y_chroma = y >> 1;
+      const int y_chroma = y >> 1;
 
-        if (y & 1)  // odd scanline ?
+      if (y & 1) // odd scanline ?
+      {
+        uint chromaCb = srcImage[chromaOffset + y_chroma * nSourcePitch + x];
+        uint chromaCr =
+            srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1];
+
+        if (y_chroma < ((height >> 1) - 1)) // interpolate chroma vertically
         {
-            uint chromaCb = srcImage[chromaOffset + y_chroma * nSourcePitch + x    ];
-            uint chromaCr = srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1];
-
-            if (y_chroma < ((height >> 1) - 1)) // interpolate chroma vertically
-            {
-                chromaCb = (chromaCb + srcImage[chromaOffset + (y_chroma + 1) * nSourcePitch + x    ] + 1) >> 1;
-                chromaCr = (chromaCr + srcImage[chromaOffset + (y_chroma + 1) * nSourcePitch + x + 1] + 1) >> 1;
-            }
-
-            yuv101010Pel[0] |= (chromaCb << ( COLOR_COMPONENT_BIT_SIZE       + 2));
-            yuv101010Pel[0] |= (chromaCr << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
-
-            yuv101010Pel[1] |= (chromaCb << ( COLOR_COMPONENT_BIT_SIZE       + 2));
-            yuv101010Pel[1] |= (chromaCr << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
-        }
-        else
-        {
-            yuv101010Pel[0] |= ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x    ] << ( COLOR_COMPONENT_BIT_SIZE       + 2));
-            yuv101010Pel[0] |= ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1] << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
-
-            yuv101010Pel[1] |= ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x    ] << ( COLOR_COMPONENT_BIT_SIZE       + 2));
-            yuv101010Pel[1] |= ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1] << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
+          chromaCb =
+              (chromaCb +
+               srcImage[chromaOffset + (y_chroma + 1) * nSourcePitch + x] +
+               1) >>
+              1;
+          chromaCr =
+              (chromaCr +
+               srcImage[chromaOffset + (y_chroma + 1) * nSourcePitch + x + 1] +
+               1) >>
+              1;
         }
 
-        // this steps performs the color conversion
-        uint yuvi[6];
-        float red[2], green[2], blue[2];
+        yuv101010Pel[0] |= (chromaCb << (COLOR_COMPONENT_BIT_SIZE + 2));
+        yuv101010Pel[0] |= (chromaCr << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
 
-        yuvi[0] =  (yuv101010Pel[0] &   COLOR_COMPONENT_MASK    );
-        yuvi[1] = ((yuv101010Pel[0] >>  COLOR_COMPONENT_BIT_SIZE)       & COLOR_COMPONENT_MASK);
-        yuvi[2] = ((yuv101010Pel[0] >> (COLOR_COMPONENT_BIT_SIZE << 1)) & COLOR_COMPONENT_MASK);
+        yuv101010Pel[1] |= (chromaCb << (COLOR_COMPONENT_BIT_SIZE + 2));
+        yuv101010Pel[1] |= (chromaCr << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
+      } else {
+        yuv101010Pel[0] |=
+            ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x]
+             << (COLOR_COMPONENT_BIT_SIZE + 2));
+        yuv101010Pel[0] |=
+            ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1]
+             << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
 
-        yuvi[3] =  (yuv101010Pel[1] &   COLOR_COMPONENT_MASK    );
-        yuvi[4] = ((yuv101010Pel[1] >>  COLOR_COMPONENT_BIT_SIZE)       & COLOR_COMPONENT_MASK);
-        yuvi[5] = ((yuv101010Pel[1] >> (COLOR_COMPONENT_BIT_SIZE << 1)) & COLOR_COMPONENT_MASK);
+        yuv101010Pel[1] |=
+            ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x]
+             << (COLOR_COMPONENT_BIT_SIZE + 2));
+        yuv101010Pel[1] |=
+            ((uint)srcImage[chromaOffset + y_chroma * nSourcePitch + x + 1]
+             << ((COLOR_COMPONENT_BIT_SIZE << 1) + 2));
+      }
 
-        // YUV to RGB Transformation conversion
-        YUV2RGB(&yuvi[0], &red[0], &green[0], &blue[0]);
-        YUV2RGB(&yuvi[3], &red[1], &green[1], &blue[1]);
+      // this steps performs the color conversion
+      uint yuvi[6];
+      float red[2], green[2], blue[2];
 
-        // Clamp the results to RGBA
+      yuvi[0] = (yuv101010Pel[0] & COLOR_COMPONENT_MASK);
+      yuvi[1] = ((yuv101010Pel[0] >> COLOR_COMPONENT_BIT_SIZE) &
+                 COLOR_COMPONENT_MASK);
+      yuvi[2] = ((yuv101010Pel[0] >> (COLOR_COMPONENT_BIT_SIZE << 1)) &
+                 COLOR_COMPONENT_MASK);
 
-        const size_t dstImagePitch = nDestPitch >> 2;
+      yuvi[3] = (yuv101010Pel[1] & COLOR_COMPONENT_MASK);
+      yuvi[4] = ((yuv101010Pel[1] >> COLOR_COMPONENT_BIT_SIZE) &
+                 COLOR_COMPONENT_MASK);
+      yuvi[5] = ((yuv101010Pel[1] >> (COLOR_COMPONENT_BIT_SIZE << 1)) &
+                 COLOR_COMPONENT_MASK);
 
-        dstImage[y * dstImagePitch + x     ] = RGBA_pack_10bit(red[0], green[0], blue[0], ((uint)0xff << 24));
-        dstImage[y * dstImagePitch + x + 1 ] = RGBA_pack_10bit(red[1], green[1], blue[1], ((uint)0xff << 24));
+      // YUV to RGB Transformation conversion
+      YUV2RGB(&yuvi[0], &red[0], &green[0], &blue[0]);
+      YUV2RGB(&yuvi[3], &red[1], &green[1], &blue[1]);
+
+      // Clamp the results to RGB
+
+      RGB_pack_10bit(red[0], green[0], blue[0],
+                     &dstImage[y * nDestPitch + x * 3]);
+      RGB_pack_10bit(red[1], green[1], blue[1],
+                     &dstImage[y * nDestPitch + (x + 1) * 3]);
     }
 
 }
@@ -188,18 +204,17 @@ namespace
 __host__ __device__ __forceinline__ int divUp(int total, int grain) {
     return (total + grain - 1) / grain;
 }
+// End OpenCV code
 
-cudaError_t convertNV12toRGBA(const uint8_t *in,
-                              size_t inPitch,
-                              uint8_t *out,
-                              size_t outPitch,
+cudaError_t convertNV12toRGBA(const uint8_t *in, size_t in_pitch,
+                              uint8_t *out, size_t out_pitch,
                               int width, int height,
                               cudaStream_t stream) {
   dim3 block(32, 8);
   dim3 grid(divUp(width, 2 * block.x), divUp(height, block.y));
 
   NV12_to_RGB<<<grid, block, 0, stream>>>(
-      in, inPitch, reinterpret_cast<uint32_t *>(out), outPitch, width, height);
+      in, in_pitch, out, out_pitch, width, height);
   return cudaPeekAtLastError();
 }
 

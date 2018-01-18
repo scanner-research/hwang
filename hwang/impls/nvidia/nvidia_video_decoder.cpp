@@ -148,6 +148,10 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
     CU_CHECK(cudaFree(convert_frame_));
   }
 
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+
   CUcontext dummy;
   CUD_CHECK(cuCtxPopCurrent(&dummy));
   // HACK(apoms): We are only using the primary context right now instead of

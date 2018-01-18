@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "hwang/util/cuda.h"
+#include <cstdint>
 
 namespace hwang {
 
