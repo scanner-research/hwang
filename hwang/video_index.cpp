@@ -12,7 +12,7 @@
  */
 
 #include "hwang/video_index.h"
-#include "hwang/descriptors.pb.h"
+#include "hwang/hwang_descriptors.pb.h"
 
 #include <string>
 #include <vector>

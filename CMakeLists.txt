@@ -151,7 +151,7 @@ endif()
 
 ###### Project code #######
 set(PROTO_FILES
-  hwang/descriptors.proto)
+  hwang/hwang_descriptors.proto)
 
 protobuf_generate_cpp(
   PROTO_SRCS PROTO_HDRS OFF ${PROTO_FILES})
