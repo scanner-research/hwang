@@ -23,7 +23,7 @@
 #include <cuda_runtime.h>
 
 #if CUDA_VERSION >= 9000
-#include <dynlink_nvcuvid.h>
+#include "hwang/impls/nvidia/nvcuvid.h"
 #else
 #include <nvcuvid.h>
 #endif
