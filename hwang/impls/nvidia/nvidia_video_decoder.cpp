@@ -22,7 +22,6 @@
 #include <thread>
 
 #include <cuda.h>
-#include <nvcuvid.h>
 
 extern "C" {
 #include "libavcodec/avcodec.h"

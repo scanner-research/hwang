@@ -21,7 +21,12 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+
+#if CUDA_VERSION >= 9000
+#include <dynlink_nvcuvid.h>
+#else
 #include <nvcuvid.h>
+#endif
 
 
 extern "C" {
