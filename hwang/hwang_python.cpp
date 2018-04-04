@@ -106,7 +106,7 @@ bp::list EncodedData_sample_offsets_wrapper(DecoderAutomata::EncodedData* data) 
 
 void EncodedData_sample_offsets_write_wrapper(DecoderAutomata::EncodedData* data,
                                                   bp::object l) {
-  data->sample_offsets = to_std_vector<uint64_t>(l); 
+  data->sample_offsets = to_std_vector<uint64_t>(l);
 }
 
 bp::list EncodedData_sample_sizes_wrapper(DecoderAutomata::EncodedData* data) {
@@ -114,7 +114,7 @@ bp::list EncodedData_sample_sizes_wrapper(DecoderAutomata::EncodedData* data) {
 }
 
 void EncodedData_sample_sizes_write_wrapper(DecoderAutomata::EncodedData *data, bp::object l) {
-  data->sample_sizes = to_std_vector<uint64_t>(l); 
+  data->sample_sizes = to_std_vector<uint64_t>(l);
 }
 
 bp::list EncodedData_valid_frames_wrapper(DecoderAutomata::EncodedData* data) {
@@ -190,6 +190,7 @@ BOOST_PYTHON_MODULE(libhwang) {
       .add_property("fps", &VideoIndex::fps)
       .add_property("frame_width", &VideoIndex::frame_width)
       .add_property("frame_height", &VideoIndex::frame_height)
+      .add_property("frames", &VideoIndex::frames)
       .add_property("sample_offsets", VideoIndex_sample_offsets_wrapper)
       .add_property("sample_sizes", VideoIndex_sample_sizes_wrapper)
       .add_property("keyframe_indices", VideoIndex_keyframe_indices_wrapper)

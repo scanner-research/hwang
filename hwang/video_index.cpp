@@ -40,7 +40,7 @@ std::vector<uint8_t> VideoIndex::serialize() const {
   proto::VideoIndex desc;
   desc.set_timescale(timescale_);
   desc.set_duration(duration_);
-  desc.set_frame_height(frame_height_);
+  desc.set_frame_width(frame_width_);
   desc.set_frame_height(frame_height_);
   for (uint64_t s : sample_offsets_) {
     desc.add_sample_offsets(s);
