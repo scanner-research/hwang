@@ -3,6 +3,8 @@ syntax = "proto3";
 package hwang.proto;
 
 message VideoIndex {
+ uint32 timescale = 7;
+ uint64 duration = 8;
  uint32 frame_width = 1;
  uint32 frame_height = 2;
  repeated uint64 sample_offsets = 3 [packed=true];

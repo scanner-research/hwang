@@ -24,7 +24,8 @@ namespace hwang {
 VideoIndex VideoIndex::deserialize(const std::vector<uint8_t> &data) {
   proto::VideoIndex desc;
   desc.ParseFromArray(data.data(), data.size());
-  return VideoIndex(desc.frame_width(), desc.frame_height(),
+  return VideoIndex(desc.timescale(), desc.duration(),
+                    desc.frame_width(), desc.frame_height(),
                     std::vector<uint64_t>(desc.sample_offsets().begin(),
                                           desc.sample_offsets().end()),
                     std::vector<uint64_t>(desc.sample_sizes().begin(),
@@ -37,7 +38,9 @@ VideoIndex VideoIndex::deserialize(const std::vector<uint8_t> &data) {
 
 std::vector<uint8_t> VideoIndex::serialize() const {
   proto::VideoIndex desc;
-  desc.set_frame_width(frame_width_);
+  desc.set_timescale(timescale_);
+  desc.set_duration(duration_);
+  desc.set_frame_height(frame_height_);
   desc.set_frame_height(frame_height_);
   for (uint64_t s : sample_offsets_) {
     desc.add_sample_offsets(s);

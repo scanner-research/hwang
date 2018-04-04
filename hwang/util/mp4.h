@@ -220,6 +220,35 @@ inline FullBox parse_mdia(GetBitsState& bs) {
   return b;
 }
 
+struct MediaHeaderBox : public FullBox {
+  uint64_t creation_time;
+  uint64_t modification_time;
+  uint32_t timescale;
+  uint64_t duration;
+};
+
+inline MediaHeaderBox parse_mdhd(GetBitsState& bs) {
+  MediaHeaderBox h;
+  *((FullBox*)&h) = parse_full_box(bs);
+  assert(h.type == string_to_type("mdhd"));
+
+  if (h.version == 1) {
+    h.creation_time = get_bits(bs, 64);
+    h.modification_time = get_bits(bs, 64);
+    h.timescale = get_bits(bs, 32);
+    h.duration = get_bits(bs, 64);
+  } else if (h.version == 0) {
+    h.creation_time = get_bits(bs, 32);
+    h.modification_time = get_bits(bs, 32);
+    h.timescale = get_bits(bs, 32);
+    h.duration = get_bits(bs, 32);
+  }
+
+  get_bits(bs, 32);
+
+  return h;
+}
+
 struct HandlerBox : public FullBox {
   uint32_t handler_type;
 };

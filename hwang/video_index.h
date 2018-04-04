@@ -22,15 +22,16 @@ class VideoIndex {
  public:
   VideoIndex() {};
 
-  VideoIndex(uint32_t width, uint32_t height,
+  VideoIndex(uint32_t timescale, uint64_t duration,
+             uint32_t width, uint32_t height,
              const std::vector<uint64_t> &sample_offsets,
              const std::vector<uint64_t> &sample_sizes,
              const std::vector<uint64_t> &keyframe_indices,
              const std::vector<uint8_t> &metadata)
-      : frame_width_(width), frame_height_(height),
-        num_frames_(sample_sizes.size()), sample_offsets_(sample_offsets),
-        sample_sizes_(sample_sizes), keyframe_indices_(keyframe_indices),
-        metadata_bytes_(metadata){};
+      : timescale_(timescale), duration_(duration), frame_width_(width),
+        frame_height_(height), num_frames_(sample_sizes.size()),
+        sample_offsets_(sample_offsets), sample_sizes_(sample_sizes),
+        keyframe_indices_(keyframe_indices), metadata_bytes_(metadata){};
 
   static VideoIndex deserialize(const std::vector<uint8_t> &data);
 
@@ -48,12 +49,17 @@ class VideoIndex {
 
   const std::vector<uint8_t>& metadata_bytes() const { return metadata_bytes_; }
 
+  uint32_t timescale() const { return timescale_; }
+  uint64_t duration() const { return duration_; }
+  double fps() const { return num_frames_ / (duration_ / (double)timescale_); }
   uint32_t frame_width() const { return frame_width_; }
   uint32_t frame_height() const { return frame_height_; }
   uint64_t frames() const { return num_frames_; }
   uint64_t num_non_ref_frames() const { return num_non_ref_frames_; }
 
 private:
+  uint32_t timescale_;
+  uint64_t duration_;
   uint32_t frame_width_;
   uint32_t frame_height_;
   uint64_t num_frames_;

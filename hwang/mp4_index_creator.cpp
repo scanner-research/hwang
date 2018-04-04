@@ -180,6 +180,8 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
       FullBox moov = parse_moov(moov_bs);
       bool found_valid_trak = false;
       uint64_t trak_offset = 0;
+
+      MediaHeaderBox mdhd;
       while ((moov_bs.offset / 8) < moov_bs.size) {
         uint32_t trak_type = 0;
         auto trak_verify_fn = [&](GetBitsState &bs) {
@@ -190,13 +192,21 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
           auto mdia_verify_fn = [&](GetBitsState &bs) {
             GetBitsState mdia_bs = restrict_bits_to_box(bs);
             FullBox mdia = parse_mdia(mdia_bs);
+            GetBitsState mdia_bs2 = mdia_bs;
+            // Search for mdia trak
+            auto mdhd_verify_fn = [&](GetBitsState &bs) {
+              mdhd = parse_mdhd(bs);
+              return true;
+            };
             // Search for hdlr trak
             auto hdlr_verify_fn = [&](GetBitsState &bs) {
               HandlerBox hdlr = parse_hdlr(bs);
               trak_type = hdlr.handler_type;
               return true;
             };
-            return search_for_box(mdia_bs, type("hdlr"), hdlr_verify_fn);
+            return
+                search_for_box(mdia_bs, type("mdhd"), mdhd_verify_fn) &&
+                search_for_box(mdia_bs2, type("hdlr"), hdlr_verify_fn);
           };
           return search_for_box(trak_bs, type("mdia"), mdia_verify_fn);
         };
@@ -223,6 +233,10 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
         done_ = true;
         return false;
       }
+
+      // Compute fps from timebase and duration
+      timescale_ = mdhd.timescale;
+      duration_ = mdhd.duration;
 
       // Excavate information from 'stbl' sample table box for the video trak
       {
@@ -715,7 +729,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
 
 VideoIndex MP4IndexCreator::get_video_index() {
-  return VideoIndex(width_, height_, sample_offsets_,
+  return VideoIndex(timescale_, duration_, width_, height_, sample_offsets_,
                     sample_sizes_, keyframe_indices_, extradata_);
 }
 
