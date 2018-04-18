@@ -11,22 +11,6 @@ using namespace hwang;
 namespace py = pybind11;
 
 namespace {
-  class GILRelease {
-  public:
-    inline GILRelease() {
-      PyEval_InitThreads();
-      m_thread_state = PyEval_SaveThread();
-    }
-
-    inline ~GILRelease() {
-      PyEval_RestoreThread(m_thread_state);
-      m_thread_state = NULL;
-    }
-
-  private:
-    PyThreadState* m_thread_state;
-  };
-
   std::string VideoIndex_serialize_wrapper(VideoIndex *index) {
     auto serialized_data = index->serialize();
     return std::string(serialized_data.begin(), serialized_data.end());
@@ -40,7 +24,7 @@ namespace {
 
   std::tuple<bool, uint64_t, uint64_t> MP4IndexCreator_feed_wrapper(MP4IndexCreator *indexer,
                                                                     const std::string data, size_t size) {
-    GILRelease r;
+    py::gil_scoped_release release;
 
     uint64_t next_offset;
     uint64_t next_size;
