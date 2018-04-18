@@ -83,12 +83,12 @@ list(APPEND CMAKE_PREFIX_PATH ${PROTOBUF_DIR})
 
 find_package(SaneProtobuf REQUIRED)
 find_package(FFmpeg REQUIRED)
-find_package(Boost COMPONENTS thread program_options regex python REQUIRED)
 find_package(GFlags REQUIRED)
 find_package(Glog REQUIRED)
 find_package(GoogleTest REQUIRED)
-find_package(PythonLibs 2.7 EXACT REQUIRED)
 find_package(OpenMP REQUIRED)
+set(PYBIND11_PYTHON_VERSION 3.5)
+find_package(pybind11 REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
@@ -108,10 +108,7 @@ set(HWANG_LIBRARIES
   "${FFMPEG_LIBRARIES}"
   "${GFLAGS_LIBRARIES}"
   "${GLOG_LIBRARIES}"
-  "-lpython2.7"
-  "${Boost_LIBRARIES}"
-  "${Boost_LIBRARY_DIRS}/libboost_python.so"
-  "${Boost_LIBRARY_DIRS}/libboost_numpy.so")
+  "${PYTHON_LIBRARIES}")
 
 include_directories(
   "."
@@ -120,7 +117,7 @@ include_directories(
   "${FFMPEG_INCLUDE_DIR}"
   "${GLOG_INCLUDE_DIRS}"
   "${PYTHON_INCLUDE_DIRS}"
-  "${Boost_INCLUDE_DIRS}")
+  "${pybind11_INCLUDE_DIR}")
 
 if (BUILD_TESTS)
   include_directories("${GTEST_INCLUDE_DIRS}")

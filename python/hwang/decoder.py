@@ -31,8 +31,8 @@ class Decoder(object):
         # Grab video index intervals
         video_intervals = slice_into_video_intervals(self.video_index, rows)
         frames = []
-        sample_offsets = list(self.video_index.sample_offsets)
-        sample_sizes = list(self.video_index.sample_sizes)
+        sample_offsets = self.video_index.sample_offsets()
+        sample_sizes = self.video_index.sample_sizes()
         sample_offsets.append(sample_offsets[-1] + sample_sizes[-1])
         sample_sizes.append(0)
 
@@ -45,8 +45,8 @@ class Decoder(object):
             encoded_data = self.f.read(end_offset - start_offset)
 
             data = EncodedData()
-            data.width = self.video_index.frame_width
-            data.height = self.video_index.frame_height
+            data.width = self.video_index.frame_width()
+            data.height = self.video_index.frame_height()
             data.start_keyframe = start_index
             data.end_keyframe = end_index
 
@@ -56,12 +56,12 @@ class Decoder(object):
             data.sample_sizes = (sample_sizes[start_index:end_index])
             data.valid_frames = valid_frames
             data.keyframes = [
-                k for k in self.video_index.keyframe_indices
+                k for k in self.video_index.keyframe_indices()
                 if k >= start_index and k <= end_index
             ]
             data.encoded_video = encoded_data
             args = [data]
-            self._decoder.initialize(args, self.video_index.metadata_bytes)
+            self._decoder.initialize(args, self.video_index.metadata_bytes())
             frames += self._decoder.get_frames(self.video_index,
                                                len(valid_frames))
 
