@@ -12,8 +12,6 @@ POSITIONAL=()
 # Ask if installed
 INSTALL_FFMPEG=true
 INSTALL_PROTOBUF=true
-
-# Assume not installed
 INSTALL_PYBIND=true
 
 INSTALL_PREFIX=$DEFAULT_INSTALL_DIR
@@ -46,6 +44,11 @@ case $key in
         ;;
     --with-protobuf)
         WITH_PROTOBUF="$2"
+        shift # past arg
+        shift # past value
+        ;;
+    --with-pybind)
+        WITH_PYBIND="$2"
         shift # past arg
         shift # past value
         ;;
@@ -85,6 +88,10 @@ fi
 if [[ ! -z ${WITH_PROTOBUF+x} ]]; then
     INSTALL_PROTOBUF=false
     PROTOBUF_DIR=$WITH_PROTOBUF
+fi
+if [[ ! -z ${WITH_PYBIND+x} ]]; then
+    INSTALL_PYBIND=false
+    PYBIND_DIR=$WITH_PYBIND
 fi
 
 if [[ $INSTALL_ALL == false ]]; then
