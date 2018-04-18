@@ -10,7 +10,6 @@ FILES_DIR=$LOCAL_DIR/thirdparty/resources
 POSITIONAL=()
 
 # Ask if installed
-INSTALL_BOOST=true
 INSTALL_FFMPEG=true
 INSTALL_PROTOBUF=true
 
@@ -36,11 +35,6 @@ case $key in
     -a|--install-all)
         INSTALL_ALL=true
         shift # past arg
-        ;;
-    --with-boost)
-        WITH_BOOST="$2"
-        shift # past arg
-        shift # past value
         ;;
     --with-ffmpeg)
         WITH_FFMPEG="$2"
@@ -69,7 +63,6 @@ echo "(customized by specifying (--prefix <dir>)"
 
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-BOOST_DIR=$INSTALL_PREFIX
 FFMPEG_DIR=$INSTALL_PREFIX
 PROTOBUF_DIR=$INSTALL_PREFIX
 
@@ -84,10 +77,6 @@ mkdir -p $INSTALL_PREFIX
 if [[ ! -z ${WITH_FFMPEG+x} ]]; then
     INSTALL_FFMPEG=false
     FFMPEG_DIR=$WITH_FFMPEG
-fi
-if [[ ! -z ${WITH_BOOST+x} ]]; then
-    INSTALL_BOOST=false
-    BOOST_DIR=$WITH_BOOST
 fi
 if [[ ! -z ${WITH_PROTOBUF+x} ]]; then
     INSTALL_PROTOBUF=false
@@ -110,22 +99,6 @@ if [[ $INSTALL_ALL == false ]]; then
             fi
         else
             INSTALL_FFMPEG=true
-        fi
-    fi
-    if [[ -z ${WITH_BOOST+x} ]]; then
-        echo -n "Do you have boost>=1.63 installed? [y/N]: "
-        read yn
-        if [[ $yn == y ]] || [[ $yn == Y ]]; then
-            INSTALL_BOOST=false
-            echo -n "Where is your boost install? [/usr/local]: "
-            read install_location
-            if [[ $install_location == "" ]]; then
-                BOOST_DIR=/usr/local
-            else
-                BOOST_DIR=$install_location
-            fi
-        else
-            INSTALL_BOOST=true
         fi
     fi
     if [[ -z ${WITH_PROTOBUF+x} ]]; then
@@ -161,17 +134,6 @@ if [[ $INSTALL_FFMPEG == true ]]; then
     echo "Done installing ffmpeg 3.3.1"
 fi
 
-if [[ $INSTALL_BOOST == true ]]; then
-    echo "Installing boost 1.63.0..."
-    cd $BUILD_DIR
-    rm -fr boost*
-    wget "https://dl.bintray.com/boostorg/release/1.63.0/source/boost_1_63_0.tar.gz" && \
-        tar -xf boost_1_63_0.tar.gz && cd boost_1_63_0 && ./bootstrap.sh && \
-        ./b2 install --prefix=$INSTALL_PREFIX && \
-        rm -rf $BUILD_DIR/boost_1_63_0.tar.gz
-    echo "Done installing boost 1.63.0"
-fi
-
 if [[ $INSTALL_PROTOBUF == true ]] && [[ ! -f $BUILD_DIR/protobuf.done ]] ; then
     # protobuf 3.4.1
     echo "Installing protobuf 3.4.1..."
@@ -196,7 +158,6 @@ echo "Done installing googletest"
 
 DEP_FILE=$LOCAL_DIR/dependencies.txt
 rm -f $DEP_FILE
-echo "BOOST_DIR=$BOOST_DIR" >> $DEP_FILE
 echo "FFMPEG_DIR=$FFMPEG_DIR" >> $DEP_FILE
 echo "PROTOBUF_DIR=$PROTOBUF_DIR" >> $DEP_FILE
 
