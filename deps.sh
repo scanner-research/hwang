@@ -13,6 +13,9 @@ POSITIONAL=()
 INSTALL_FFMPEG=true
 INSTALL_PROTOBUF=true
 
+# Assume not installed
+INSTALL_PYBIND=true
+
 INSTALL_PREFIX=$DEFAULT_INSTALL_DIR
 
 INSTALL_ALL=false
@@ -65,6 +68,7 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 
 FFMPEG_DIR=$INSTALL_PREFIX
 PROTOBUF_DIR=$INSTALL_PREFIX
+PYBIND_DIR=$INSTALL_PREFIX
 
 export C_INCLUDE_PATH=$INSTALL_PREFIX/include:$C_INCLUDE_PATH
 export LD_LIBRARY_PATH=$INSTALL_PREFIX/lib:$LD_LIBRARY_PATH
@@ -145,6 +149,19 @@ if [[ $INSTALL_PROTOBUF == true ]] && [[ ! -f $BUILD_DIR/protobuf.done ]] ; then
         make install && touch $BUILD_DIR/protobuf.done \
             || { echo 'Installing protobuf failed!' ; exit 1; }
     echo "Done installing protobuf 3.4.1"
+fi
+
+if [[ $INSTALL_PYBIND == true ]] && [[ ! -f $BUILD_DIR/pybind.done ]] ; then
+    echo "Installing pybind..."
+    rm -fr pybind11
+    git clone -b v2.2.2 https://github.com/pybind/pybind11 && \
+        cd pybind11 && \
+        mkdir build && cd build && \
+        cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -DPYBIND11_TEST=Off && \
+        make install -j${cores} && cd ../../ && \
+        touch $BUILD_DIR/pybind.done \
+            || { echo 'Installing pybind failed!' ; exit 1; }
+    echo "Done installing pybind"
 fi
 
 echo "Installing googletest..."
