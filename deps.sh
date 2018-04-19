@@ -161,6 +161,7 @@ fi
 if [[ $INSTALL_PYBIND == true ]] && [[ ! -f $BUILD_DIR/pybind.done ]] ; then
     echo "Installing pybind..."
     rm -fr pybind11
+    cd $BUILD_DIR
     git clone -b v2.2.2 https://github.com/pybind/pybind11 && \
         cd pybind11 && \
         mkdir build && cd build && \
