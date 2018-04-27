@@ -1,6 +1,16 @@
 #!/bin/bash
 
-cores=$(nproc)
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    cores=$(nproc)
+        # ...
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    cores=$(sysctl -n hw.ncpu)
+        # Mac OSX
+else
+    # Unknown.
+    echo "Unknown OSTYPE: $OSTYPE. Exiting."
+    exit 1
+fi
 
 LOCAL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR=$LOCAL_DIR/thirdparty/build
