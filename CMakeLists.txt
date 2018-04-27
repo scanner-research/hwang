@@ -86,11 +86,8 @@ find_package(FFmpeg REQUIRED)
 find_package(GFlags REQUIRED)
 find_package(Glog REQUIRED)
 find_package(GoogleTest REQUIRED)
-find_package(OpenMP REQUIRED)
-set(PYBIND11_PYTHON_VERSION 3.5)
+set(PYBIND11_PYTHON_VERSION 3)
 find_package(pybind11 REQUIRED)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 set(GTEST_INCLUDE_DIRS
   "${GOOGLETEST_INCLUDE_DIRS}")
