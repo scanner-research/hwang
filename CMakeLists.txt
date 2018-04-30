@@ -175,7 +175,9 @@ add_library(hwang SHARED
   $<TARGET_OBJECTS:hwang_source>
   ${PROTO_SRCS})
 
-if(APPLE)
+if(NOT APPLE AND UNIX)
+  set(PLATFORM_LINK_FLAGS "-pthread -ldl -lrt")
+elseif(APPLE)
   set(PLATFORM_LINK_FLAGS
     "-framework CoreFoundation"
     "-framework CoreMedia"
