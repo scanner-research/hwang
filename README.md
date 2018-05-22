@@ -11,13 +11,13 @@ decoder).
 
 ## Setup
 
-Hwang only supports python2 for now, so please make sure to be using a python2
-environment. The following has been tested on Ubuntu 16.04.
+The following has been tested on Ubuntu 16.04.
 
 ## Linux Pre-Requisites
 Install system wide packages
 ```
-[sudo] apt-get install git cmake libgoogle-glog-dev libgflags-dev python2.7-dev python-pip yasm libx264-dev build-essential wget
+[sudo] apt-get install git cmake libgoogle-glog-dev libgflags-dev yasm libx264-dev build-essential wget
+bash deps.sh
 ```
 
 Then install python packages
@@ -43,7 +43,6 @@ mkdir build
 cd build
 cmake ..
 make -j
-cd ../python
-python setup.py bdist_wheel
-pip install dist/hwang-0.1.0-py2-none-any.whl
+cd ..
+bash build.sh
 ```

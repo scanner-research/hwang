@@ -2,8 +2,20 @@
 
 PKG=hwang
 
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    cores=$(nproc)
+        # ...
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    cores=$(gnproc)
+        # Mac OSX
+else
+    # Unknown.
+    echo "Unknown OSTYPE: $OSTYPE. Exiting."
+    exit 1
+fi
+
 pushd build
-if make -j$(nproc); then
+if make -j$cores; then
     popd
     cd python
     if rm -rf dist && \
