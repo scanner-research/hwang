@@ -17,7 +17,7 @@ shutil.copyfile(SO_PATH, DEST_PATH)
 
 setup(
     name='hwang',
-    version='0.0.1',
+    version='0.0.2',
     url='https://github.com/scanner-research/hwang',
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',

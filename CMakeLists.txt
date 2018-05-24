@@ -102,7 +102,6 @@ message("${Boost_LIBRARIES}")
 set(HWANG_LIBRARIES
   "${PROTOBUF_LIBRARY}"
   "${FFMPEG_LIBRARIES}"
-  "${FFMPEG_LIBRARIES}"
   "${GFLAGS_LIBRARIES}"
   "${GLOG_LIBRARIES}"
   "${PYTHON_LIBRARIES}")
@@ -229,12 +228,12 @@ configure_file(cmake/HwangConfig.cmake.in
   "${PROJECT_BINARY_DIR}/cmake/HwangConfig.cmake" @ONLY)
 
 install(FILES "${PROJECT_BINARY_DIR}/cmake/HwangConfig.cmake"
-  DESTINATION cmake)
+  DESTINATION share/hwang)
 
 install_headers_with_directory(PUBLIC_HEADER_FILES)
 
 install(EXPORT HwangTarget
-  DESTINATION cmake)
+  DESTINATION share/hwang)
 
 # Make init files so python code can import from subdirectories
 # foreach(FIL ${PROTO_FILES} ${GRPC_PROTO_FILES})
