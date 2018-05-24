@@ -1,26 +1,33 @@
 from setuptools import setup
+import shutil
 import os
+from sys import platform
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-SO_PATH = os.path.abspath('{p:s}/../build/libhwang.so'.format(p=SCRIPT_DIR))
-DEST_PATH = os.path.abspath('{p:s}/hwang/'.format(p=SCRIPT_DIR))
-os.system('ln -s {from_path:s} {to_path:s}'.format(from_path=SO_PATH,
-                                         to_path=DEST_PATH))
+if platform == 'linux' or platform == 'linux2':
+    EXT = '.so'
+else:
+    EXT = '.dylib'
+
+SO_PATH = os.path.abspath('{p:s}/../build/libhwang{e:s}'.format(p=SCRIPT_DIR,
+                                                                e=EXT))
+DEST_PATH = os.path.abspath('{p:s}/hwang/libhwang.so'.format(p=SCRIPT_DIR))
+shutil.copyfile(SO_PATH, DEST_PATH)
 
 setup(
     name='hwang',
-    version='0.1.0',
+    version='0.0.1',
     url='https://github.com/scanner-research/hwang',
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',
-
     packages=['hwang'],
+    include_package_data=True,
     package_data={
         'hwang': [
-            '*.so',
+            './*.so',
         ]
     },
-
+    zip_safe=False,
     license='Apache 2.0'
 )
