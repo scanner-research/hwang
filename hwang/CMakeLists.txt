@@ -5,8 +5,7 @@ set(SOURCE_FILES
   mp4_index_creator.cpp
   video_index.cpp
   decoder_automata.cpp
-  video_decoder_factory.cpp
-  hwang_python.cpp)
+  video_decoder_factory.cpp)
 
 if (BUILD_CUDA)
   add_definitions(-DHAVE_NVIDIA_VIDEO_HARDWARE)

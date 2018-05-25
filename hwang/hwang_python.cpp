@@ -83,7 +83,7 @@ namespace {
 
 } // namespace
 
-PYBIND11_MODULE(libhwang, m) {
+PYBIND11_MODULE(hwang_python, m) {
   m.doc() = "Hwang C library";
 
   py::class_<VideoIndex>(m, "VideoIndex")
