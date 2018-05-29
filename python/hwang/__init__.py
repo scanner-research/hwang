@@ -2,7 +2,6 @@ from .video_index import *
 from .decoder import *
 import os
 
-
 def index_video(f_or_string):
     def w(f):
         f.seek(0, os.SEEK_END)

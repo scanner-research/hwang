@@ -83,8 +83,9 @@ namespace {
 
 } // namespace
 
-PYBIND11_MODULE(hwang_python, m) {
+PYBIND11_MODULE(_python, m) {
   m.doc() = "Hwang C library";
+  m.attr("__name__") = "hwang._python";
 
   py::class_<VideoIndex>(m, "VideoIndex")
     .def_static("deserialize", &VideoIndex_deserialize_wrapper)

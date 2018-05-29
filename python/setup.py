@@ -13,14 +13,13 @@ else:
 
 SO_PATH = os.path.abspath('{p:s}/../build/libhwang{e:s}'.format(p=SCRIPT_DIR,
                                                                 e=EXT))
-DEST_PATH = os.path.abspath('{p:s}/hwang/libhwang.so'.format(p=SCRIPT_DIR))
+DEST_PATH = os.path.abspath('{p:s}/python/hwang/lib/libhwang{e:s}'.format(p=SCRIPT_DIR,
+                                                                   e=EXT))
+os.makedirs(os.path.join(SCRIPT_DIR, 'python/hwang/lib/'), exist_ok=True)
 shutil.copyfile(SO_PATH, DEST_PATH)
-if EXT != '.so':
-    DEST_PATH = os.path.abspath('{p:s}/hwang/libhwang'.format(p=SCRIPT_DIR) + EXT)
-    shutil.copyfile(SO_PATH, DEST_PATH)
 
 module1 = Extension(
-    'hwang_python',
+    'hwang._python',
     include_dirs = [ROOT_DIR,
                     os.path.join(ROOT_DIR, 'build'),
                     os.path.join(ROOT_DIR, 'thirdparty/install/include')],
@@ -32,7 +31,7 @@ module1 = Extension(
 
 setup(
     name='hwang',
-    version='0.1.0',
+    version='0.2.0',
     url='https://github.com/scanner-research/hwang',
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',
