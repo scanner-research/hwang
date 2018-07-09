@@ -16,7 +16,7 @@ The following has been tested on Ubuntu 16.04.
 ## Linux Pre-Requisites
 Install system wide packages
 ```
-[sudo] apt-get install git cmake libgoogle-glog-dev libgflags-dev yasm libx264-dev build-essential wget
+[sudo] apt-get install git cmake libgoogle-glog-dev libgflags-dev yasm libx264-dev build-essential wget unzip autoconf libtool
 bash deps.sh
 ```
 
