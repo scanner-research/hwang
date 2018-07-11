@@ -13,7 +13,7 @@ class Decoder(object):
         self.video_index = video_index
 
         if isinstance(f_or_path, str):
-            f = open(f_or_path)
+            f = open(f_or_path, 'rb')
         else:
             f = f_or_path
         self.f = f
