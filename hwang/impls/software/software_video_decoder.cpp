@@ -118,8 +118,8 @@ SoftwareVideoDecoder::~SoftwareVideoDecoder() {
   sws_freeContext(sws_context_);
 }
 
-void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
-                                     const std::vector<uint8_t> &extradata) {
+Result SoftwareVideoDecoder::configure(const FrameInfo &metadata,
+                                       const std::vector<uint8_t> &extradata) {
   if (annexb_) {
     av_bitstream_filter_close(annexb_);
   }
@@ -145,11 +145,13 @@ void SoftwareVideoDecoder::configure(const FrameInfo &metadata,
   cc_->extradata_size = extradata_.size();
 
   annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+
+  return Result();
 }
 
-bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
-                                size_t encoded_size, bool keyframe,
-                                bool discontinuity) {
+Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
+                                  size_t encoded_size, bool keyframe,
+                                  bool discontinuity) {
   uint8_t *filtered_buffer = nullptr;
   int32_t filtered_size = 0;
   int err;
@@ -160,10 +162,10 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     if (err < 0) {
       char err_msg[256];
       av_strerror(err, err_msg, 256);
-      LOG(FATAL) << "Error while filtering frame (" +
-                        std::to_string(err) + "): " + std::string(err_msg);
+      return Result(false, "Error while filtering frame (" +
+                               std::to_string(err) +
+                               "): " + std::string(err_msg));
     }
-
     if (keyframe) {
       BSFCompatContext *priv = (BSFCompatContext *)annexb_->priv_data;
       AVBSFContext *priv_ctx = (AVBSFContext *)priv->ctx;
@@ -243,12 +245,12 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     cc_->extradata_size = extradata_.size();
 
     annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
-    return false;
+    return Result();
   }
   if (filtered_size > 0) {
     if (av_new_packet(&packet_, filtered_size) < 0) {
-      fprintf(stderr, "could not allocate packet for feeding into decoder\n");
-      assert(false);
+      return Result(false,
+                    "could not allocate packet for feeding into decoder");
     }
     memcpy(packet_.data, filtered_buffer, filtered_size);
   } else {
@@ -263,10 +265,10 @@ bool SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     free(filtered_buffer);
   }
 
-  return decoded_frame_queue_.size() > 0;
+  return Result();
 }
 
-bool SoftwareVideoDecoder::discard_frame() {
+Result SoftwareVideoDecoder::discard_frame() {
   if (decoded_frame_queue_.size() > 0) {
     AVFrame* frame;
     decoded_frame_queue_.pop(frame);
@@ -274,17 +276,18 @@ bool SoftwareVideoDecoder::discard_frame() {
     frame_pool_.push(frame);
   }
 
-  return decoded_frame_queue_.size() > 0;
+  return Result();
 }
 
-bool SoftwareVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_size) {
+Result SoftwareVideoDecoder::get_frame(uint8_t *decoded_buffer,
+                                       size_t decoded_size) {
   int64_t size_left = decoded_size;
 
-  AVFrame* frame;
+  AVFrame *frame;
   if (decoded_frame_queue_.size() > 0) {
     decoded_frame_queue_.pop(frame);
   } else {
-    return false;
+    return Result();
   }
 
   if (reset_context_) {
@@ -303,7 +306,7 @@ bool SoftwareVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_siz
   }
 
   if (sws_context_ == NULL) {
-    LOG(FATAL) << "Could not get sws_context for rgb conversion";
+    return Result(false, "Could not get sws_context for rgb conversion");
   }
 
   uint8_t* scale_buffer = decoded_buffer;
@@ -314,15 +317,15 @@ bool SoftwareVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_siz
       av_image_fill_arrays(out_slices, out_linesizes, scale_buffer,
                            AV_PIX_FMT_RGB24, frame_width_, frame_height_, 1);
   if (required_size < 0) {
-    LOG(FATAL) << "Error in av_image_fill_arrays";
+    return Result(false, "Error in av_image_fill_arrays");
   }
   if (required_size > decoded_size) {
-    LOG(FATAL) << "Decode buffer not large enough for image";
+    return Result(false, "Decode buffer not large enough for image");
   }
   auto scale_start = now();
   if (sws_scale(sws_context_, frame->data, frame->linesize, 0, frame->height,
                 out_slices, out_linesizes) < 0) {
-    LOG(FATAL) << "sws_scale failed";
+    return Result(false, "sws_scale failed");
   }
   auto scale_end = now();
 
@@ -333,14 +336,16 @@ bool SoftwareVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_siz
   //   profiler_->add_interval("ffmpeg:scale_frame", scale_start, scale_end);
   // }
 
-  return decoded_frame_queue_.size() > 0;
+  return Result();
 }
 
 int SoftwareVideoDecoder::decoded_frames_buffered() {
   return decoded_frame_queue_.size();
 }
 
-void SoftwareVideoDecoder::wait_until_frames_copied() {}
+Result SoftwareVideoDecoder::wait_until_frames_copied() {
+  return Result();
+}
 
 void SoftwareVideoDecoder::feed_packet(bool flush) {
   int error;

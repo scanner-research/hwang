@@ -57,10 +57,10 @@ class DecoderAutomata {
     std::vector<uint64_t> keyframes;
     std::vector<uint64_t> valid_frames;
   };
-  void initialize(const std::vector<EncodedData> &encoded_data,
-                  const std::vector<uint8_t> &extradata);
+  Result initialize(const std::vector<EncodedData> &encoded_data,
+                    const std::vector<uint8_t> &extradata);
 
-  void get_frames(uint8_t* buffer, int32_t num_frames);
+  Result get_frames(uint8_t* buffer, int32_t num_frames);
 
   // void set_profiler(Profiler* profiler);
 
@@ -106,6 +106,9 @@ class DecoderAutomata {
   std::atomic<int64_t> feeder_next_keyframe_idx_;
   std::mutex feeder_mutex_;
   std::condition_variable wake_feeder_;
+
+  std::atomic<bool> result_set_;
+  Result feeder_result_;
 };
 
 }

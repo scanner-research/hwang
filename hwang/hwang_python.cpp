@@ -11,6 +11,7 @@ using namespace hwang;
 namespace py = pybind11;
 
 namespace {
+
   std::string VideoIndex_serialize_wrapper(VideoIndex *index) {
     auto serialized_data = index->serialize();
     return std::string(serialized_data.begin(), serialized_data.end());
@@ -56,12 +57,23 @@ namespace {
     data->encoded_video = std::vector<uint8_t>(v.data(), v.data() + v.size());
   }
 
-  std::vector<py::array_t<uint8_t>> DecoderAutomata_get_frames_wrapper(DecoderAutomata &dec,
-                                                                  const VideoIndex &index,
-                                                                  uint32_t num_frames) {
+  void DecoderAutomata_initialize_wrapper(
+      DecoderAutomata &dec, const std::vector<EncodedData> &encoded_data,
+      const std::vector<uint8_t> &extradata) {
+    Result result = dec.initialize(encoded_data, extradata);
+    if (!result.ok) {
+      throw std::runtime_error(result.message);
+    }
+  }
+
+  std::vector<py::array_t<uint8_t>> DecoderAutomata_get_frames_wrapper(
+      DecoderAutomata &dec, const VideoIndex &index, uint32_t num_frames) {
     size_t frame_size = index.frame_width() * index.frame_height() * 3;
     std::vector<uint8_t> frame_buffer(frame_size * num_frames);
-    dec.get_frames(frame_buffer.data(), num_frames);
+    Result result = dec.get_frames(frame_buffer.data(), num_frames);
+    if (!result.ok) {
+      throw std::runtime_error(result.message);
+    }
     std::vector<py::array_t<uint8_t>> frames;
     for (uint32_t i = 0; i < num_frames; ++i) {
       uint8_t *buffer = (uint8_t*)malloc(frame_size);
@@ -70,12 +82,10 @@ namespace {
              i * index.frame_width() * index.frame_height() * 3,
              frame_size);
       frames.push_back(py::array_t<uint8_t>(py::buffer_info(
-                                       (void*) buffer,
-                                       (size_t) sizeof(uint8_t),
-                                       py::format_descriptor<uint8_t>::format(),
-                                       3,
-                                       { (long int) index.frame_height(), (long int) index.frame_width(), 3L },
-                                       { (long int) index.frame_width() * 3, 3L, 1L })));
+          (void *)buffer, (size_t)sizeof(uint8_t),
+          py::format_descriptor<uint8_t>::format(), 3,
+          {(long int)index.frame_height(), (long int)index.frame_width(), 3L},
+          {(long int)index.frame_width() * 3, 3L, 1L})));
     }
 
     return frames;
@@ -142,6 +152,6 @@ PYBIND11_MODULE(_python, m) {
 
   py::class_<DecoderAutomata>(m, "DecoderAutomata")
     .def(py::init<DeviceHandle, uint32_t, VideoDecoderType>())
-    .def("initialize", &DecoderAutomata::initialize)
+    .def("initialize", &DecoderAutomata_initialize_wrapper)
     .def("get_frames", &DecoderAutomata_get_frames_wrapper);
 }

@@ -51,4 +51,20 @@ struct DeviceHandle {
 
 static const DeviceHandle CPU_DEVICE = {DeviceType::CPU, 0};
 
+struct Result {
+  Result() : ok(true) {}
+  Result(bool _ok, const std::string &_message) : ok(_ok), message(_message) {}
+
+  bool ok;
+  std::string message;
+};
+
+#define RETURN_ON_ERROR(expr__)                                                \
+  do {                                                                         \
+    Result res__ = expr__;                                                     \
+    if (!res__.ok) {                                                           \
+      return res__;                                                            \
+    }                                                                          \
+  } while (0);
+
 }

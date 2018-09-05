@@ -45,22 +45,21 @@ public:
 
   ~SoftwareVideoDecoder();
 
-  void configure(const FrameInfo &metadata,
+  Result configure(const FrameInfo &metadata,
                  const std::vector<uint8_t>& extradata) override;
 
-  bool feed(const uint8_t* encoded_buffer, size_t encoded_size,
-            bool keyframe,
-            bool discontinuity = false) override;
+  Result feed(const uint8_t *encoded_buffer, size_t encoded_size, bool keyframe,
+              bool discontinuity = false) override;
 
-  bool discard_frame() override;
+  Result discard_frame() override;
 
-  bool get_frame(uint8_t* decoded_buffer, size_t decoded_size) override;
+  Result get_frame(uint8_t *decoded_buffer, size_t decoded_size) override;
 
   int decoded_frames_buffered() override;
 
-  void wait_until_frames_copied() override;
+  Result wait_until_frames_copied() override;
 
- private:
+private:
   void feed_packet(bool flush);
 
   int device_id_;

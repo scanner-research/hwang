@@ -45,28 +45,27 @@ namespace hwang {
 ///////////////////////////////////////////////////////////////////////////////
 /// NVIDIAVideoDecoder
 class NVIDIAVideoDecoder : public VideoDecoderInterface {
- public:
+public:
   NVIDIAVideoDecoder(int device_id, DeviceType output_type,
                      CUcontext cuda_context);
 
   ~NVIDIAVideoDecoder();
 
-  void configure(const FrameInfo &metadata,
-                 const std::vector<uint8_t>& extradata) override;
+  Result configure(const FrameInfo &metadata,
+                   const std::vector<uint8_t> &extradata) override;
 
-  bool feed(const uint8_t* encoded_buffer, size_t encoded_size,
-            bool keyframe,
-            bool discontinuity = false) override;
+  Result feed(const uint8_t *encoded_buffer, size_t encoded_size, bool keyframe,
+              bool discontinuity = false) override;
 
-  bool discard_frame() override;
+  Result discard_frame() override;
 
-  bool get_frame(uint8_t* decoded_buffer, size_t decoded_size) override;
+  Result get_frame(uint8_t *decoded_buffer, size_t decoded_size) override;
 
   int decoded_frames_buffered() override;
 
-  void wait_until_frames_copied() override;
+  Result wait_until_frames_copied() override;
 
- private:
+private:
   static int cuvid_handle_video_sequence(void* opaque, CUVIDEOFORMAT* format);
 
   static int cuvid_handle_picture_decode(void* opaque,
@@ -104,5 +103,4 @@ class NVIDIAVideoDecoder : public VideoDecoderInterface {
   CUdeviceptr mapped_frames_[max_mapped_frames_];
   uint8_t* convert_frame_ = nullptr;
 };
-
 }
