@@ -59,7 +59,7 @@ struct Result {
   std::string message;
 };
 
-#define RETURN_ON_ERROR(expr__)                                                \
+#define HWANG_RETURN_ON_ERROR(expr__)                                          \
   do {                                                                         \
     Result res__ = expr__;                                                     \
     if (!res__.ok) {                                                           \
@@ -67,4 +67,4 @@ struct Result {
     }                                                                          \
   } while (0);
 
-}
+} // namespace hwang

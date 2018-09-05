@@ -67,7 +67,7 @@ Result DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
                                  const std::vector<uint8_t> &extradata) {
   assert(!encoded_data.empty());
   while (decoder_->decoded_frames_buffered() > 0) {
-    RETURN_ON_ERROR(decoder_->discard_frame());
+    HWANG_RETURN_ON_ERROR(decoder_->discard_frame());
   }
 
   std::unique_lock<std::mutex> lk(feeder_mutex_);
@@ -85,10 +85,10 @@ Result DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
   info.width = encoded_data[0].width;
 
   // printf("extradata size %lu\n", extradata.size());
-  RETURN_ON_ERROR(decoder_->configure(info, extradata))
+  HWANG_RETURN_ON_ERROR(decoder_->configure(info, extradata))
 
   if (frames_retrieved_ > 0) {
-    RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+    HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
   }
 
   set_feeder_idx(0);
@@ -123,7 +123,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
       // Make sure to not feed seek packet if we reached end of stream
       if (encoded_data_.size() > feeder_data_idx_) {
         if (seeking_) {
-          RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+          HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
           seeking_ = false;
         }
       }
@@ -145,7 +145,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
 
   while (frames_retrieved_ < frames_to_get_) {
     if (result_set_.load()) {
-      RETURN_ON_ERROR(feeder_result_);
+      HWANG_RETURN_ON_ERROR(feeder_result_);
     }
     if (decoder_->decoded_frames_buffered() > 0) {
       auto iter = now();
@@ -158,7 +158,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
         assert(current_frame_ <= valid_frames.at(retriever_valid_idx_));
         if (current_frame_ == valid_frames.at(retriever_valid_idx_)) {
           uint8_t *decoded_buffer = buffer + frames_retrieved_ * frame_size_;
-          RETURN_ON_ERROR(decoder_->get_frame(decoded_buffer, frame_size_));
+          HWANG_RETURN_ON_ERROR(decoder_->get_frame(decoded_buffer, frame_size_));
           more_frames = (decoder_->decoded_frames_buffered() > 0);
           retriever_valid_idx_++;
           if (retriever_valid_idx_ == valid_frames.size()) {
@@ -184,7 +184,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
               }
 
               if (seeking_) {
-                RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+                HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
                 seeking_ = false;
               }
 
@@ -208,7 +208,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
           total_frames_used++;
           frames_retrieved_++;
         } else {
-          RETURN_ON_ERROR(decoder_->discard_frame());
+          HWANG_RETURN_ON_ERROR(decoder_->discard_frame());
           more_frames = (decoder_->decoded_frames_buffered() > 0);
         }
         current_frame_++;
@@ -217,7 +217,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
     }
     std::this_thread::yield();
   }
-  RETURN_ON_ERROR(decoder_->wait_until_frames_copied());
+  HWANG_RETURN_ON_ERROR(decoder_->wait_until_frames_copied());
   // if (profiler_) {
   //   profiler_->add_interval("get_frames", start, now());
   //   profiler_->increment("frames_used", total_frames_used);
