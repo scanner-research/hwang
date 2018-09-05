@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include "hwang/common.h"
+
 #include <vector>
 #include <cstdint>
 #include <cstddef>
@@ -29,20 +31,19 @@ class VideoDecoderInterface {
     uint32_t width;
     uint32_t height;
   };
-  virtual void configure(const FrameInfo &metadata,
-                         const std::vector<uint8_t> &extradata) = 0;
+  virtual Result configure(const FrameInfo &metadata,
+                           const std::vector<uint8_t> &extradata) = 0;
 
-  virtual bool feed(const uint8_t* encoded_buffer, size_t encoded_size,
-                    bool keyframe,
-                    bool discontinuity = false) = 0;
+  virtual Result feed(const uint8_t *encoded_buffer, size_t encoded_size,
+                      bool keyframe, bool discontinuity = false) = 0;
 
-  virtual bool discard_frame() = 0;
+  virtual Result discard_frame() = 0;
 
-  virtual bool get_frame(uint8_t* decoded_buffer, size_t decoded_size) = 0;
+  virtual Result get_frame(uint8_t *decoded_buffer, size_t decoded_size) = 0;
 
   virtual int decoded_frames_buffered() = 0;
 
-  virtual void wait_until_frames_copied() = 0;
+  virtual Result wait_until_frames_copied() = 0;
 
   // void set_profiler(Profiler* profiler);
 

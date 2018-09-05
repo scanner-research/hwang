@@ -160,7 +160,7 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
   CUD_CHECK(cuDevicePrimaryCtxRelease(device_id_));
 }
 
-void NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
+Result NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
                                    const std::vector<uint8_t>& extradata) {
   cudaSetDevice(device_id_);
   if (annexb_) {
@@ -266,9 +266,10 @@ void NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
 
   //   feed(encoded_packet, encoded_packet_size);
   // }
+  return Result();
 }
 
-bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size,
+Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size,
                               bool keyframe,
                               bool discontinuity) {
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
@@ -322,7 +323,7 @@ bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size
 
     CUcontext dummy;
     CUD_CHECK(cuCtxPopCurrent(&dummy));
-    return false;
+    return Result();
   }
 
   // BITSTREAM FILTERING
@@ -338,8 +339,9 @@ bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size
     if (err < 0) {
       char err_msg[256];
       av_strerror(err, err_msg, 256);
-      LOG(FATAL) << "Error while filtering frame (" +
-                        std::to_string(err) + "): " + std::string(err_msg);
+      return Result(false, "Error while filtering frame (" +
+                               std::to_string(err) +
+                               "): " + std::string(err_msg));
     }
 
     if (keyframe) {
@@ -399,10 +401,10 @@ bool NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size
     free(filtered_buffer);
   }
 
-  return frame_queue_elements_ > 0;
+  return Result();
 }
 
-bool NVIDIAVideoDecoder::discard_frame() {
+Result NVIDIAVideoDecoder::discard_frame() {
   std::unique_lock<std::mutex> lock(frame_queue_mutex_);
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
   cudaSetDevice(device_id_);
@@ -417,10 +419,11 @@ bool NVIDIAVideoDecoder::discard_frame() {
   CUcontext dummy;
   CUD_CHECK(cuCtxPopCurrent(&dummy));
 
-  return frame_queue_elements_ > 0;
+  return Result();
 }
 
-bool NVIDIAVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_size) {
+Result NVIDIAVideoDecoder::get_frame(uint8_t *decoded_buffer,
+                                     size_t decoded_size) {
   auto start = now();
   std::unique_lock<std::mutex> lock(frame_queue_mutex_);
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
@@ -470,14 +473,14 @@ bool NVIDIAVideoDecoder::get_frame(uint8_t* decoded_buffer, size_t decoded_size)
   //   profiler_->add_interval("get_frame", start, now());
   // }
 
-  return frame_queue_elements_;
+  return Result();
 }
 
 int NVIDIAVideoDecoder::decoded_frames_buffered() {
   return frame_queue_elements_;
 }
 
-void NVIDIAVideoDecoder::wait_until_frames_copied() {}
+Result NVIDIAVideoDecoder::wait_until_frames_copied() { return Result(); }
 
 int NVIDIAVideoDecoder::cuvid_handle_video_sequence(void* opaque,
                                                     CUVIDEOFORMAT* format) {

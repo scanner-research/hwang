@@ -38,13 +38,15 @@ DecoderAutomata::DecoderAutomata(DeviceHandle device_handle,
       feeder_waiting_(false), not_done_(true), frames_retrieved_(0),
       skip_frames_(false) {
   feeder_thread_ = std::thread(&DecoderAutomata::feeder, this);
+  result_set_ = false;
 }
 
 DecoderAutomata::~DecoderAutomata() {
   {
     frames_to_get_ = 0;
     frames_retrieved_ = 0;
-    while (decoder_->discard_frame()) {
+    while (decoder_->decoded_frames_buffered() > 0) {
+      decoder_->discard_frame();
     }
 
     std::unique_lock<std::mutex> lk(feeder_mutex_);
@@ -61,10 +63,11 @@ DecoderAutomata::~DecoderAutomata() {
   feeder_thread_.join();
 }
 
-void DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
+Result DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
                                  const std::vector<uint8_t> &extradata) {
   assert(!encoded_data.empty());
-  while (decoder_->discard_frame()) {
+  while (decoder_->decoded_frames_buffered() > 0) {
+    RETURN_ON_ERROR(decoder_->discard_frame());
   }
 
   std::unique_lock<std::mutex> lk(feeder_mutex_);
@@ -82,19 +85,21 @@ void DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
   info.width = encoded_data[0].width;
 
   // printf("extradata size %lu\n", extradata.size());
-  decoder_->configure(info, extradata);
+  RETURN_ON_ERROR(decoder_->configure(info, extradata))
 
   if (frames_retrieved_ > 0) {
-    decoder_->feed(nullptr, 0, false, true);
+    RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
   }
 
   set_feeder_idx(0);
   info_ = info;
   std::atomic_thread_fence(std::memory_order_release);
   seeking_ = false;
+
+  return Result();
 }
 
-void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
+Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
   int64_t total_frames_decoded = 0;
   int64_t total_frames_used = 0;
 
@@ -118,7 +123,7 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
       // Make sure to not feed seek packet if we reached end of stream
       if (encoded_data_.size() > feeder_data_idx_) {
         if (seeking_) {
-          decoder_->feed(nullptr, 0, false, true);
+          RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
           seeking_ = false;
         }
       }
@@ -139,6 +144,9 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
   // }
 
   while (frames_retrieved_ < frames_to_get_) {
+    if (result_set_.load()) {
+      RETURN_ON_ERROR(feeder_result_);
+    }
     if (decoder_->decoded_frames_buffered() > 0) {
       auto iter = now();
       // New frames
@@ -150,7 +158,8 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
         assert(current_frame_ <= valid_frames.at(retriever_valid_idx_));
         if (current_frame_ == valid_frames.at(retriever_valid_idx_)) {
           uint8_t *decoded_buffer = buffer + frames_retrieved_ * frame_size_;
-          more_frames = decoder_->get_frame(decoded_buffer, frame_size_);
+          RETURN_ON_ERROR(decoder_->get_frame(decoded_buffer, frame_size_));
+          more_frames = (decoder_->decoded_frames_buffered() > 0);
           retriever_valid_idx_++;
           if (retriever_valid_idx_ == valid_frames.size()) {
             // Move to next decode args
@@ -165,7 +174,8 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
                 // skip_frames_ = true;
                 std::unique_lock<std::mutex> lk(feeder_mutex_);
                 wake_feeder_.wait(lk, [this, &total_frames_decoded] {
-                  while (decoder_->discard_frame()) {
+                  while (decoder_->decoded_frames_buffered() > 0) {
+                    decoder_->discard_frame();
                     total_frames_decoded++;
                   }
                   return feeder_waiting_.load();
@@ -174,7 +184,7 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
               }
 
               if (seeking_) {
-                decoder_->feed(nullptr, 0, false, true);
+                RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
                 seeking_ = false;
               }
 
@@ -195,29 +205,26 @@ void DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
                                   .valid_frames[retriever_valid_idx_],
                               std::memory_order_release);
           }
-          // printf("got frame %d\n", frames_retrieved_.load());
           total_frames_used++;
           frames_retrieved_++;
         } else {
-          more_frames = decoder_->discard_frame();
+          RETURN_ON_ERROR(decoder_->discard_frame());
+          more_frames = (decoder_->decoded_frames_buffered() > 0);
         }
         current_frame_++;
         total_frames_decoded++;
-        // printf("curr frame %d, frames decoded %d\n", current_frame_,
-        //        total_frames_decoded);
       }
-      // if (profiler_) {
-      //   profiler_->add_interval("iter", iter, now());
-      // }
     }
     std::this_thread::yield();
   }
-  decoder_->wait_until_frames_copied();
+  RETURN_ON_ERROR(decoder_->wait_until_frames_copied());
   // if (profiler_) {
   //   profiler_->add_interval("get_frames", start, now());
   //   profiler_->increment("frames_used", total_frames_used);
   //   profiler_->increment("frames_decoded", total_frames_decoded);
   // }
+
+  return Result();
 }
 
 // void DecoderAutomata::set_profiler(Profiler *profiler) {
@@ -325,9 +332,13 @@ void DecoderAutomata::feeder() {
       //   }
       // }
 
-      // printf("feeding frame %d, %d, %d\n", feeder_current_frame_.load(),
-      //        feeder_buffer_offset_.load(), encoded_buffer_size)i
-      decoder_->feed(encoded_packet, encoded_packet_size, is_keyframe, false);
+      Result result = decoder_->feed(encoded_packet, encoded_packet_size,
+                                     is_keyframe, false);
+      if (!result.ok) {
+        result_set_ = true;
+        feeder_result_ = result;
+        continue;
+      }
 
       if (feeder_current_frame_ == feeder_next_frame_) {
         feeder_valid_idx_++;
