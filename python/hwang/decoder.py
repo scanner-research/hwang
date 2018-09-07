@@ -1,4 +1,4 @@
-from hwang_python import *
+from ._python import *
 import hwang
 
 
