@@ -18,6 +18,10 @@ DEST_PATH = os.path.abspath('{p:s}/python/hwang/lib/libhwang{e:s}'.format(p=SCRI
 os.makedirs(os.path.join(SCRIPT_DIR, 'python/hwang/lib/'), exist_ok=True)
 shutil.copyfile(SO_PATH, DEST_PATH)
 
+REQUIRED_PACKAGES = [
+    'protobuf == 3.4.0',
+]
+
 module1 = Extension(
     'hwang._python',
     include_dirs = [ROOT_DIR,
@@ -31,7 +35,7 @@ module1 = Extension(
 
 setup(
     name='hwang',
-    version='0.3.3',
+    version='0.3.4',
     url='https://github.com/scanner-research/hwang',
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',
