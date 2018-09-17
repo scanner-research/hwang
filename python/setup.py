@@ -40,6 +40,7 @@ setup(
     author='Alex Poms',
     author_email='apoms@cs.cmu.edu',
     packages=['hwang'],
+    install_requires=REQUIRED_PACKAGES,
     license='Apache 2.0',
     ext_modules=[module1],
 )
