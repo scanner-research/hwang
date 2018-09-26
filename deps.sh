@@ -186,7 +186,8 @@ echo "Installing googletest..."
 cd $BUILD_DIR
 rm -fr googletest
 git clone https://github.com/google/googletest && \
-    cd googletest && mkdir build && cd build && \
+    cd googletest && git checkout release-1.8.1 && \
+    mkdir build && cd build && \
     cmake .. -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX && \
     make -j${cores} && make install
 echo "Done installing googletest"
