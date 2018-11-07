@@ -112,9 +112,11 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
     wake_feeder_.wait(lk, [this] { return feeder_waiting_.load(); });
   }
 
+  frames_retrieved_ = 0;
+  frames_to_get_ = num_frames;
   // We don't want to send discontinuity packet and flush until we know
   // we have exhausted this decode args group
-  if (encoded_data_.size() > retriever_valid_idx_) {
+  if (encoded_data_.size() > retriever_data_idx_) {
     const auto &valid_frames = encoded_data_[retriever_data_idx_].valid_frames;
     // If we are at the end of a segment or if the retriever and the feeder
     // are working on the same segment
@@ -131,8 +133,6 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
       // Start up feeder thread
       {
         std::unique_lock<std::mutex> lk(feeder_mutex_);
-        frames_retrieved_ = 0;
-        frames_to_get_ = num_frames;
         feeder_waiting_ = false;
       }
       wake_feeder_.notify_one();
