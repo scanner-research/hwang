@@ -89,6 +89,7 @@ std::vector<py::array_t<uint8_t>> DecoderAutomata_get_frames_wrapper(
         py::format_descriptor<uint8_t>::format(), 3,
         {(long int)index.frame_height(), (long int)index.frame_width(), 3L},
         {(long int)index.frame_width() * 3, 3L, 1L})));
+    free(buffer);
   }
 
   return frames;
