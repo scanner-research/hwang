@@ -84,11 +84,14 @@ std::vector<py::array_t<uint8_t>> DecoderAutomata_get_frames_wrapper(
            frame_buffer.data() +
                i * index.frame_width() * index.frame_height() * 3,
            frame_size);
-    frames.push_back(py::array_t<uint8_t>(py::buffer_info(
-        (void *)buffer, (size_t)sizeof(uint8_t),
-        py::format_descriptor<uint8_t>::format(), 3,
+    // Pass deallocation responsibility (i.e. ownership) to Python runtime.
+    // https://stackoverflow.com/questions/44659924/returning-numpy-arrays-via-pybind11
+    py::capsule free_when_done(buffer, [](void* buf) { free(buf); });
+    frames.push_back(py::array_t<uint8_t>(
         {(long int)index.frame_height(), (long int)index.frame_width(), 3L},
-        {(long int)index.frame_width() * 3, 3L, 1L})));
+        {(long int)index.frame_width() * 3, 3L, 1L},
+        buffer,
+        free_when_done));
   }
 
   return frames;
