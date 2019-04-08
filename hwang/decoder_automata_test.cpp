@@ -307,7 +307,7 @@ TEST(DecoderAutomata, GatherFramesComparison) {
                                            video_index.frame_height() * 3);
   {
     DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
-    std::vector<uint64_t> desired_frames = {target_frame};
+    std::vector<uint64_t> desired_frames = {static_cast<uint64_t>(target_frame)};
     std::vector<DecoderAutomata::EncodedData> args =
         get_strided_range_frames(video_index, video_bytes, desired_frames);
     decoder->initialize(args, video_index.metadata_bytes());
