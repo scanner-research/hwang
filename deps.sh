@@ -123,7 +123,7 @@ if [[ $INSTALL_ALL == false ]]; then
         fi
     fi
     if [[ -z ${WITH_PROTOBUF+x} ]]; then
-        echo -n "Do you have protobuf>=3.40 installed? [y/N]: "
+        echo -n "Do you have protobuf>=3.6.1 installed? [y/N]: "
         read yn
         if [[ $yn == y ]] || [[ $yn == Y ]]; then
             INSTALL_PROTOBUF=false
@@ -156,16 +156,16 @@ if [[ $INSTALL_FFMPEG == true ]]; then
 fi
 
 if [[ $INSTALL_PROTOBUF == true ]] && [[ ! -f $BUILD_DIR/protobuf.done ]] ; then
-    # protobuf 3.4.1
-    echo "Installing protobuf 3.4.1..."
+    # protobuf 3.6.1
+    echo "Installing protobuf 3.6.1..."
     cd $BUILD_DIR
     rm -fr protobuf
-    git clone -b v3.4.1 https://github.com/google/protobuf.git && \
+    git clone -b v3.6.1 https://github.com/google/protobuf.git && \
         cd protobuf && bash ./autogen.sh && \
         ./configure --prefix=$INSTALL_PREFIX && make -j$cores && \
         make install && touch $BUILD_DIR/protobuf.done \
             || { echo 'Installing protobuf failed!' ; exit 1; }
-    echo "Done installing protobuf 3.4.1"
+    echo "Done installing protobuf 3.6.1"
 fi
 
 if [[ $INSTALL_PYBIND == true ]] && [[ ! -f $BUILD_DIR/pybind.done ]] ; then

@@ -19,7 +19,7 @@ os.makedirs(os.path.join(SCRIPT_DIR, 'python/hwang/lib/'), exist_ok=True)
 shutil.copyfile(SO_PATH, DEST_PATH)
 
 REQUIRED_PACKAGES = [
-    'protobuf == 3.4.0',
+    'protobuf == 3.6.1',
 ]
 
 module1 = Extension(
