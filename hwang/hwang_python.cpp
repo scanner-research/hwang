@@ -159,7 +159,7 @@ PYBIND11_MODULE(_python, m) {
                      &DecoderAutomata::EncodedData::valid_frames);
 
   py::class_<DecoderAutomata>(m, "DecoderAutomata")
-      .def(py::init<DeviceHandle, uint32_t, VideoDecoderType>())
+      .def(py::init(&DecoderAutomata::make_instance))
       .def("initialize", &DecoderAutomata_initialize_wrapper)
       .def("get_frames", &DecoderAutomata_get_frames_wrapper);
 }

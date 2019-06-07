@@ -176,7 +176,8 @@ TEST(DecoderAutomata, GetAllFrames) {
   // Create decoder
   VideoDecoderType decoder_type = VideoDecoderType::SOFTWARE;
   DeviceHandle device = CPU_DEVICE;
-  DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+  DecoderAutomata *decoder =
+      DecoderAutomata::make_instance(device, 1, decoder_type);
 
   // Grab frames
   std::vector<DecoderAutomata::EncodedData> args = get_all_frames(video_index, video_bytes);
@@ -216,7 +217,8 @@ TEST(DecoderAutomata, GetStridedRangesFrames) {
   // Create decoder
   VideoDecoderType decoder_type = VideoDecoderType::SOFTWARE;
   DeviceHandle device = CPU_DEVICE;
-  DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+  DecoderAutomata *decoder =
+      DecoderAutomata::make_instance(device, 1, decoder_type);
 
   // Grab frames
   std::vector<uint64_t> desired_frames;
@@ -278,7 +280,8 @@ TEST(DecoderAutomata, GatherFramesComparison) {
   std::vector<uint8_t> all_frame_buffer(video_index.frame_width() *
                                         video_index.frame_height() * 3);
   {
-    DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+    DecoderAutomata *decoder =
+        DecoderAutomata::make_instance(device, 1, decoder_type);
     std::vector<DecoderAutomata::EncodedData> args =
         get_all_frames(video_index, video_bytes);
     decoder->initialize(args, video_index.metadata_bytes());
@@ -306,8 +309,10 @@ TEST(DecoderAutomata, GatherFramesComparison) {
   std::vector<uint8_t> gather_frame_buffer(video_index.frame_width() *
                                            video_index.frame_height() * 3);
   {
-    DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
-    std::vector<uint64_t> desired_frames = {static_cast<uint64_t>(target_frame)};
+    DecoderAutomata *decoder =
+        DecoderAutomata::make_instance(device, 1, decoder_type);
+    std::vector<uint64_t> desired_frames = {
+        static_cast<uint64_t>(target_frame)};
     std::vector<DecoderAutomata::EncodedData> args =
         get_strided_range_frames(video_index, video_bytes, desired_frames);
     decoder->initialize(args, video_index.metadata_bytes());
@@ -355,7 +360,8 @@ TEST(DecoderAutomata, GetAllFramesGPU) {
   DeviceHandle device;
   device.type = DeviceType::GPU;
   device.id = 0;
-  DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+  DecoderAutomata *decoder =
+      DecoderAutomata::make_instance(device, 1, decoder_type);
 
   // Grab frames
   std::vector<DecoderAutomata::EncodedData> args = get_all_frames(video_index, video_bytes);
@@ -399,7 +405,7 @@ TEST(DecoderAutomata, GetStridedRangesFramesGPU) {
   DeviceHandle device;
   device.type = DeviceType::GPU;
   device.id = 0;
-  DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+  DecoderAutomata* decoder = DecoderAutomata::make_instance(device, 1, decoder_type);
 
   // Grab frames
   std::vector<uint64_t> desired_frames;
@@ -467,7 +473,8 @@ TEST(DecoderAutomata, GatherFramesComparisonGPU) {
   std::vector<uint8_t> all_frame_buffer(video_index.frame_width() *
                                         video_index.frame_height() * 3);
   {
-    DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+    DecoderAutomata *decoder =
+        DecoderAutomata::make_instance(device, 1, decoder_type);
     std::vector<DecoderAutomata::EncodedData> args =
         get_all_frames(video_index, video_bytes);
     decoder->initialize(args, video_index.metadata_bytes());
@@ -495,7 +502,8 @@ TEST(DecoderAutomata, GatherFramesComparisonGPU) {
   std::vector<uint8_t> gather_frame_buffer(video_index.frame_width() *
                                            video_index.frame_height() * 3);
   {
-    DecoderAutomata* decoder = new DecoderAutomata(device, 1, decoder_type);
+    DecoderAutomata *decoder =
+        DecoderAutomata::make_instance(device, 1, decoder_type);
     std::vector<uint64_t> desired_frames = {target_frame};
     std::vector<DecoderAutomata::EncodedData> args =
         get_strided_range_frames(video_index, video_bytes, desired_frames);

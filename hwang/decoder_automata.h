@@ -30,32 +30,37 @@ class DecoderAutomata {
   DecoderAutomata() = delete;
   DecoderAutomata(const DecoderAutomata&) = delete;
   DecoderAutomata(const DecoderAutomata&& other) = delete;
+  DecoderAutomata(DeviceHandle device_handle, int32_t num_devices,
+                  VideoDecoderType decoder_type,
+                  VideoDecoderInterface* decoder);
 
  public:
-  DecoderAutomata(DeviceHandle device_handle, int32_t num_devices,
-                  VideoDecoderType decoder_type);
-  ~DecoderAutomata();
+   static DecoderAutomata *make_instance(DeviceHandle device_handle,
+                                         int32_t num_devices,
+                                         VideoDecoderType decoder_type);
+   ~DecoderAutomata();
 
-  struct EncodedData {
-    inline bool operator==(const EncodedData &other) const
-    {
-      return encoded_video == other.encoded_video && width == other.width &&
-             height == other.height && start_keyframe == other.start_keyframe &&
-             end_keyframe == other.end_keyframe &&
-             sample_offsets == other.sample_offsets &&
-             sample_sizes == other.sample_sizes &&
-             keyframes == other.keyframes && valid_frames == other.valid_frames;
-    }
+   struct EncodedData {
+     inline bool operator==(const EncodedData &other) const {
+       return encoded_video == other.encoded_video && width == other.width &&
+              height == other.height &&
+              start_keyframe == other.start_keyframe &&
+              end_keyframe == other.end_keyframe &&
+              sample_offsets == other.sample_offsets &&
+              sample_sizes == other.sample_sizes &&
+              keyframes == other.keyframes &&
+              valid_frames == other.valid_frames;
+     }
 
-    std::vector<uint8_t> encoded_video;
-    uint32_t width;
-    uint32_t height;
-    uint64_t start_keyframe;
-    uint64_t end_keyframe;
-    std::vector<uint64_t> sample_offsets;
-    std::vector<uint64_t> sample_sizes;
-    std::vector<uint64_t> keyframes;
-    std::vector<uint64_t> valid_frames;
+     std::vector<uint8_t> encoded_video;
+     uint32_t width;
+     uint32_t height;
+     uint64_t start_keyframe;
+     uint64_t end_keyframe;
+     std::vector<uint64_t> sample_offsets;
+     std::vector<uint64_t> sample_sizes;
+     std::vector<uint64_t> keyframes;
+     std::vector<uint64_t> valid_frames;
   };
   Result initialize(const std::vector<EncodedData> &encoded_data,
                     const std::vector<uint8_t> &extradata);
