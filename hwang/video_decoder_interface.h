@@ -30,6 +30,7 @@ class VideoDecoderInterface {
   struct FrameInfo {
     uint32_t width;
     uint32_t height;
+    std::string format;
   };
   virtual Result configure(const FrameInfo &metadata,
                            const std::vector<uint8_t> &extradata) = 0;

@@ -59,6 +59,7 @@ SoftwareVideoDecoder::SoftwareVideoDecoder(int32_t device_id,
                                            int32_t thread_count)
   : device_id_(device_id),
     output_type_(output_type),
+    thread_count_(thread_count),
     codec_(nullptr),
     cc_(nullptr),
     reset_context_(true),
@@ -71,25 +72,6 @@ SoftwareVideoDecoder::SoftwareVideoDecoder(int32_t device_id,
 
   av_init_packet(&packet_);
 
-  codec_ = avcodec_find_decoder(AV_CODEC_ID_H264);
-  if (!codec_) {
-    fprintf(stderr, "could not find h264 decoder\n");
-    exit(EXIT_FAILURE);
-  }
-
-  cc_ = avcodec_alloc_context3(codec_);
-  if (!cc_) {
-    fprintf(stderr, "could not alloc codec context");
-    exit(EXIT_FAILURE);
-  }
-
-  // cc_->thread_count = thread_count;
-  cc_->thread_count = 4;
-
-  if (avcodec_open2(cc_, codec_, NULL) < 0) {
-    fprintf(stderr, "could not open codec\n");
-    assert(false);
-  }
   annexb_ = nullptr;
 }
 
@@ -137,6 +119,39 @@ Result SoftwareVideoDecoder::configure(const FrameInfo &metadata,
   extradata_ = extradata;
   extradata_.resize(extradata.size() + AV_INPUT_BUFFER_PADDING_SIZE);
 
+  AVCodecID codec_id = AV_CODEC_ID_H264;
+  bitstream_filter_name_ = "h264_mp4toannexb";
+  if (metadata.format == "h264" ||
+      metadata.format == "avc1") {
+    codec_id = AV_CODEC_ID_H264;
+    bitstream_filter_name_ = "h264_mp4toannexb";
+  } else if (metadata.format == "h265" ||
+             metadata.format == "hev1" ||
+             metadata.format == "hevc") {
+    codec_id = AV_CODEC_ID_HEVC;
+    bitstream_filter_name_ = "hevc_mp4toannexb";
+  } else {
+    return Result(false, "Unsupported video codec: " + metadata.format +
+                             ". Supported codecs are: h264, hevc/h265");
+  }
+  codec_ = avcodec_find_decoder(codec_id);
+  if (!codec_) {
+    return Result(false,
+                  "Could not find decoder for codec: " + metadata.format);
+  }
+  cc_ = avcodec_alloc_context3(codec_);
+  if (!cc_) {
+    return Result(false, "Could not alloc codec context for codec: " +
+                             metadata.format);
+  }
+
+  cc_->thread_count = thread_count_;
+
+  if (avcodec_open2(cc_, codec_, NULL) < 0) {
+    return Result(false, "Could not open codec for format: " +
+                             metadata.format);
+  }
+
   if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
     free(cc_->extradata);
   }
@@ -144,7 +159,7 @@ Result SoftwareVideoDecoder::configure(const FrameInfo &metadata,
   memcpy(cc_->extradata, extradata_.data(), extradata_.size());
   cc_->extradata_size = extradata_.size();
 
-  annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+  annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
 
   return Result();
 }
@@ -169,7 +184,6 @@ Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     if (keyframe) {
       BSFCompatContext *priv = (BSFCompatContext *)annexb_->priv_data;
       AVBSFContext *priv_ctx = (AVBSFContext *)priv->ctx;
-      H264BSFContext *s = (H264BSFContext *)priv_ctx->priv_data;
 
       uint8_t *extra_buffer = priv_ctx->par_out->extradata;
       size_t extra_size = priv_ctx->par_out->extradata_size;
@@ -244,7 +258,7 @@ Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     memcpy(cc_->extradata, extradata_.data(), extradata_.size());
     cc_->extradata_size = extradata_.size();
 
-    annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+    annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
     return Result();
   }
   if (filtered_size > 0) {

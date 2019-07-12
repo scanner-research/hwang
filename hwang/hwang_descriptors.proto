@@ -7,6 +7,7 @@ message VideoIndex {
  uint64 duration = 8;
  uint32 frame_width = 1;
  uint32 frame_height = 2;
+ string format = 9;
  repeated uint64 sample_offsets = 3 [packed=true];
  repeated uint64 sample_sizes = 4 [packed=true];
  repeated uint64 keyframe_indices = 5 [packed=true];

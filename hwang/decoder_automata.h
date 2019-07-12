@@ -46,6 +46,7 @@ class DecoderAutomata {
               height == other.height &&
               start_keyframe == other.start_keyframe &&
               end_keyframe == other.end_keyframe &&
+              format == other.format &&
               sample_offsets == other.sample_offsets &&
               sample_sizes == other.sample_sizes &&
               keyframes == other.keyframes &&
@@ -57,6 +58,7 @@ class DecoderAutomata {
      uint32_t height;
      uint64_t start_keyframe;
      uint64_t end_keyframe;
+     std::string format;
      std::vector<uint64_t> sample_offsets;
      std::vector<uint64_t> sample_sizes;
      std::vector<uint64_t> keyframes;

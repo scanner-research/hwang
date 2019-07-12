@@ -63,6 +63,7 @@ class MP4IndexCreator {
   uint64_t duration_;
   uint32_t width_;
   uint32_t height_;
+  std::string format_;
   std::vector<uint64_t> sample_offsets_;
   std::vector<uint64_t> sample_sizes_;
   std::vector<uint64_t> keyframe_indices_;

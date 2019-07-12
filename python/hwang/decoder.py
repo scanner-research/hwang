@@ -47,6 +47,7 @@ class Decoder(object):
             data = EncodedData()
             data.width = self.video_index.frame_width()
             data.height = self.video_index.frame_height()
+            data.format = self.video_index.format()
             data.start_keyframe = start_index
             data.end_keyframe = end_index
 

@@ -31,6 +31,10 @@ const TestVideoInfo
     test_video_unfragmented("https://storage.googleapis.com/scanner-data/"
                             "tutorial_assets/star_wars_heros_faces.mp4");
 
+const TestVideoInfo
+    test_video_hevc("https://test-videos.co.uk/vids/bigbuckbunny/mp4/h265/1080/"
+                    "Big_Buck_Bunny_1080_10s_1MB.mp4");
+
 inline std::string download_video(const TestVideoInfo& info) {
   std::string local_video_path;
   temp_file(local_video_path);

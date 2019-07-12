@@ -94,6 +94,7 @@ Result DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
   VideoDecoderInterface::FrameInfo info;
   info.height = encoded_data[0].height;
   info.width = encoded_data[0].width;
+  info.format = encoded_data[0].format;
 
   // printf("extradata size %lu\n", extradata.size());
   HWANG_RETURN_ON_ERROR(decoder_->configure(info, extradata))

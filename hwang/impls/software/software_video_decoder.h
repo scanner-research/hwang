@@ -46,7 +46,7 @@ public:
   ~SoftwareVideoDecoder();
 
   Result configure(const FrameInfo &metadata,
-                 const std::vector<uint8_t>& extradata) override;
+                   const std::vector<uint8_t>& extradata) override;
 
   Result feed(const uint8_t *encoded_buffer, size_t encoded_size, bool keyframe,
               bool discontinuity = false) override;
@@ -64,9 +64,11 @@ private:
 
   int device_id_;
   DeviceType output_type_;
+  int thread_count_;
   AVPacket packet_;
   AVCodec* codec_;
   AVCodecContext* cc_;
+  std::string bitstream_filter_name_;
   AVBitStreamFilterContext* annexb_;
   std::vector<uint8_t> extradata_;
 

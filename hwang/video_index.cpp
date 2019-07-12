@@ -26,6 +26,7 @@ VideoIndex VideoIndex::deserialize(const std::vector<uint8_t> &data) {
   desc.ParseFromArray(data.data(), data.size());
   return VideoIndex(desc.timescale(), desc.duration(),
                     desc.frame_width(), desc.frame_height(),
+                    desc.format(),
                     std::vector<uint64_t>(desc.sample_offsets().begin(),
                                           desc.sample_offsets().end()),
                     std::vector<uint64_t>(desc.sample_sizes().begin(),
@@ -42,6 +43,7 @@ std::vector<uint8_t> VideoIndex::serialize() const {
   desc.set_duration(duration_);
   desc.set_frame_width(frame_width_);
   desc.set_frame_height(frame_height_);
+  desc.set_format(format_);
   for (uint64_t s : sample_offsets_) {
     desc.add_sample_offsets(s);
   }

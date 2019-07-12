@@ -82,6 +82,7 @@ private:
   std::vector<cudaStream_t> streams_;
   AVCodec* codec_;
   AVCodecContext* cc_;
+  std::string bitstream_filter_name_;
   AVBitStreamFilterContext* annexb_;
 
   int32_t frame_width_;

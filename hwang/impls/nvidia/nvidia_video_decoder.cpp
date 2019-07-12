@@ -46,16 +46,6 @@ typedef struct BSFCompatContext {
     int extradata_updated;
 } BSFCompatContext;
 
-typedef struct H264BSFContext {
-    int32_t  sps_offset;
-    int32_t  pps_offset;
-    uint8_t  length_size;
-    uint8_t  new_idr;
-    uint8_t  idr_sps_seen;
-    uint8_t  idr_pps_seen;
-    int      extradata_parsed;
-} H264BSFContext;
-
 }
 
 NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
@@ -72,25 +62,6 @@ NVIDIAVideoDecoder::NVIDIAVideoDecoder(int device_id, DeviceType output_type,
   // FOR BITSTREAM FILTERING
   avcodec_register_all();
 
-  codec_ = avcodec_find_decoder(AV_CODEC_ID_H264);
-  if (!codec_) {
-    fprintf(stderr, "could not find h264 decoder\n");
-    exit(EXIT_FAILURE);
-  }
-
-  cc_ = avcodec_alloc_context3(codec_);
-  if (!cc_) {
-    fprintf(stderr, "could not alloc codec context");
-    exit(EXIT_FAILURE);
-  }
-
-  // cc_->thread_count = thread_count;
-  cc_->thread_count = 4;
-
-  if (avcodec_open2(cc_, codec_, NULL) < 0) {
-    fprintf(stderr, "could not open codec\n");
-    assert(false);
-  }
   annexb_ = nullptr;
   // FOR BITSTREAM FILTERING
 
@@ -161,12 +132,51 @@ NVIDIAVideoDecoder::~NVIDIAVideoDecoder() {
 }
 
 Result NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
-                                   const std::vector<uint8_t>& extradata) {
+                                     const std::vector<uint8_t>& extradata) {
   cudaSetDevice(device_id_);
   if (annexb_) {
     av_bitstream_filter_close(annexb_);
   }
-  annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+
+  AVCodecID codec_id = AV_CODEC_ID_H264;
+  cudaVideoCodec cuda_codec_id = cudaVideoCodec_H264;
+  bitstream_filter_name_ = "h264_mp4toannexb";
+  if (metadata.format == "h264" ||
+      metadata.format == "avc1") {
+    codec_id = AV_CODEC_ID_H264;
+    cuda_codec_id = cudaVideoCodec_H264;
+    bitstream_filter_name_ = "h264_mp4toannexb";
+  } else if (metadata.format == "h265" ||
+             metadata.format == "hev1" ||
+             metadata.format == "hevc") {
+    codec_id = AV_CODEC_ID_HEVC;
+    cuda_codec_id = cudaVideoCodec_HEVC;
+    bitstream_filter_name_ = "hevc_mp4toannexb";
+  } else {
+    return Result(false, "Unsupported video codec: " + metadata.format +
+                             ". Supported codecs are: h264, hevc/h265");
+  }
+
+  codec_ = avcodec_find_decoder(codec_id);
+  if (!codec_) {
+    return Result(false,
+                  "Could not find decoder for codec: " + metadata.format);
+  }
+  cc_ = avcodec_alloc_context3(codec_);
+  if (!cc_) {
+    return Result(false, "Could not alloc codec context for codec: " +
+                             metadata.format);
+  }
+
+  cc_->thread_count = 1;
+
+  if (avcodec_open2(cc_, codec_, NULL) < 0) {
+    return Result(false, "Could not open codec for format: " +
+                             metadata.format);
+  }
+
+
+  annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
 
   frame_width_ = metadata.width;
   frame_height_ = metadata.height;
@@ -216,7 +226,7 @@ Result NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
 
   CUVIDPARSERPARAMS cuparseinfo = {};
   // cuparseinfo.CodecType = metadata.codec_type;
-  cuparseinfo.CodecType = cudaVideoCodec_H264;
+  cuparseinfo.CodecType = cuda_codec_id;
   cuparseinfo.ulMaxNumDecodeSurfaces = max_output_frames_;
   cuparseinfo.ulMaxDisplayDelay = 1;
   cuparseinfo.pUserData = this;
@@ -231,7 +241,7 @@ Result NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
 
   CUVIDDECODECREATEINFO cuinfo = {};
   // cuinfo.CodecType = metadata.codec_type;
-  cuinfo.CodecType = cudaVideoCodec_H264;
+  cuinfo.CodecType = cuda_codec_id;
   // cuinfo.ChromaFormat = metadata.chroma_format;
   cuinfo.ChromaFormat = cudaVideoChromaFormat_420;
   cuinfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
@@ -318,7 +328,7 @@ Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_si
     memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
     cc_->extradata_size = metadata_packets_.size();
 
-    annexb_ = av_bitstream_filter_init("h264_mp4toannexb");
+    annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
     // For bitstream filtering
 
     CUcontext dummy;
@@ -347,7 +357,6 @@ Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_si
     if (keyframe) {
       BSFCompatContext *priv = (BSFCompatContext *)annexb_->priv_data;
       AVBSFContext *priv_ctx = (AVBSFContext *)priv->ctx;
-      H264BSFContext *s = (H264BSFContext *)priv_ctx->priv_data;
 
       uint8_t *extra_buffer = priv_ctx->par_out->extradata;
       size_t extra_size = priv_ctx->par_out->extradata_size;

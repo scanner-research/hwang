@@ -28,8 +28,8 @@ MP4IndexCreator_feed_wrapper(MP4IndexCreator *indexer, const std::string data,
                              size_t size) {
   py::gil_scoped_release release;
 
-  uint64_t next_offset;
-  uint64_t next_size;
+  uint64_t next_offset = 0;
+  uint64_t next_size = 0;
   bool ret = indexer->feed(reinterpret_cast<const uint8_t *>(data.data()), size,
                            next_offset, next_size);
   return std::make_tuple(ret, next_offset, next_size);
@@ -111,6 +111,7 @@ PYBIND11_MODULE(_python, m) {
       .def("fps", &VideoIndex::fps)
       .def("frame_width", &VideoIndex::frame_width)
       .def("frame_height", &VideoIndex::frame_height)
+      .def("format", &VideoIndex::format)
       .def("frames", &VideoIndex::frames)
       .def("sample_offsets", &VideoIndex::sample_offsets)
       .def("sample_sizes", &VideoIndex::sample_sizes)
@@ -146,6 +147,7 @@ PYBIND11_MODULE(_python, m) {
                     EncodedData_encoded_video_write_wrapper)
       .def_readwrite("width", &DecoderAutomata::EncodedData::width)
       .def_readwrite("height", &DecoderAutomata::EncodedData::height)
+      .def_readwrite("format", &DecoderAutomata::EncodedData::format)
       .def_readwrite("start_keyframe",
                      &DecoderAutomata::EncodedData::start_keyframe)
       .def_readwrite("end_keyframe",

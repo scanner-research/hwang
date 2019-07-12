@@ -30,6 +30,7 @@ MP4IndexCreator::MP4IndexCreator(uint64_t file_size)
 bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                            uint64_t& next_offset,
                            uint64_t& next_size) {
+  const bool PRINT_DEBUG = false;
   // 1.  Search for 'ftype' container to ensure this is a proper mp4 file
   // 2.  Search for the 'moov' container
   // 2a. If there is a 'mvex' box, handle movie fragments
@@ -67,6 +68,10 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   bs.buffer = data;
   bs.offset = 0;
   bs.size = size;
+
+  if (PRINT_DEBUG) {
+    printf("first bs size: %lu\n", bs.size);
+  }
 
   auto type = [](const std::string &s) { return string_to_type(s); };
   auto size_left = [&]() { return bs.size - (bs.offset / 8); };
@@ -106,17 +111,16 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   }                                                                            \
   return true;
 
-  auto search_for_box = [](GetBitsState& bs, uint32_t type,
+  auto search_for_box = [](GetBitsState &bs, uint32_t type,
                            std::function<bool(GetBitsState &)> fn) {
     while ((bs.offset / 8) < bs.size) {
       FullBox b = probe_box_type(bs);
-      // printf("looking for %s, parsed box type: %s, parsed size: %ld, "
-      //        "offset: %ld, size: %ld\n",
-      //        type_to_string(type).c_str(),
-      //        type_to_string(b.type).c_str(),
-      //        b.size,
-      //        bs.offset / 8,
-      //        bs.size);
+      if (PRINT_DEBUG) {
+        printf("looking for %s, parsed box type: %s, parsed size: %ld, "
+               "offset: %ld, size: %ld\n",
+               type_to_string(type).c_str(), type_to_string(b.type).c_str(),
+               b.size, bs.offset / 8, bs.size);
+      }
       if (b.type == type) {
         GetBitsState bs2 = bs;
         bool result = fn(bs2);
@@ -133,14 +137,12 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
   while ((bs.offset / 8) < bs.size && !is_done()) {
     // Get type of next box
     FullBox b = probe_box_type(bs);
-    // printf("parsed box type: %s, size: %ld, bs off %ld, size %ld\n",
-    //        type_to_string(b.type).c_str(),
-    //        b.size,
-    //        bs.offset / 8,
-    //        bs.size
-    //        );
     assert(b.size != 0);
-    //printf("box type %s, size %lu\n", type_to_string(b.type).c_str(), b.size);
+    if (PRINT_DEBUG) {
+      printf("parsed box type: %s, size: %ld, bs off %ld, size %ld\n",
+             type_to_string(b.type).c_str(), b.size, bs.offset / 8, bs.size);
+      printf("box type %s, size %lu\n", type_to_string(b.type).c_str(), b.size);
+    }
     if (!parsed_ftyp_ && b.type == type("ftyp")) {
       if (size_left() < b.size) {
         // Get more data since we don't have this entire box
@@ -417,6 +419,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
                   int16_t width;
                   int16_t height;
+                  std::string format;
                   std::vector<uint8_t> extradata;
                   {
                     GetBitsState bs = stbl_bs;
@@ -430,17 +433,39 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
                                 parse_visual_sample_entry(vs_bs);
                             width = vs.width;
                             height = vs.height;
+                            format = type_to_string(vs.type);
+                            if (PRINT_DEBUG) {
+                              printf("visual sample entry type %s\n",
+                                     format.c_str());
+                            }
                             if (vs_bs.offset / 8 <
-                                stsd_bs.offset / 8 + vs.size &&
-                                vs.type == string_to_type("avc1")) {
-                              GetBitsState vs_bs2 = vs_bs;
-                              FullBox b2 = parse_box(vs_bs2);
-                              if (b2.type == string_to_type("avcC")) {
-                                size_t size = b2.size - (vs_bs2.offset / 8 -
-                                                         vs_bs.offset / 8);
-                                extradata.resize(size);
-                                memcpy(extradata.data(),
-                                       vs_bs2.buffer + vs_bs2.offset / 8, size);
+                                stsd_bs.offset / 8 + vs.size) {
+                              if (vs.type == string_to_type("avc1")) {
+                                GetBitsState vs_bs2 = vs_bs;
+                                FullBox b2 = parse_box(vs_bs2);
+                                if (b2.type == string_to_type("avcC")) {
+                                  size_t size = b2.size - (vs_bs2.offset / 8 -
+                                                           vs_bs.offset / 8);
+                                  extradata.resize(size);
+                                  memcpy(extradata.data(),
+                                         vs_bs2.buffer + vs_bs2.offset / 8,
+                                         size);
+                                }
+                              } else if (vs.type == string_to_type("hev1")) {
+                                GetBitsState vs_bs2 = vs_bs;
+                                FullBox b2 = parse_box(vs_bs2);
+                                if (b2.type == string_to_type("hvcC")) {
+                                  size_t size = b2.size - (vs_bs2.offset / 8 -
+                                                           vs_bs.offset / 8);
+                                  extradata.resize(size);
+                                  memcpy(extradata.data(),
+                                         vs_bs2.buffer + vs_bs2.offset / 8,
+                                         size);
+                                }
+                                if (PRINT_DEBUG) {
+                                  printf("extradata size %lu\n",
+                                         extradata.size());
+                                }
                               }
                             }
                             stsd_bs.offset += vs.size * 8;
@@ -460,6 +485,7 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
                   width_ = width;
                   height_ = height;
+                  format_ = format;
 
                   for (size_t i = 0; i < sample_sizes.size(); ++i) {
                     sample_offsets_.push_back(sample_offsets[i]);
@@ -724,13 +750,15 @@ bool MP4IndexCreator::feed(const uint8_t* data, size_t size,
 
   MORE_DATA_LIMIT(offset_, 1024);
 
+
   return true;
 }
 
 
 VideoIndex MP4IndexCreator::get_video_index() {
-  return VideoIndex(timescale_, duration_, width_, height_, sample_offsets_,
-                    sample_sizes_, keyframe_indices_, extradata_);
+  return VideoIndex(timescale_, duration_, width_, height_, format_,
+                    sample_offsets_, sample_sizes_, keyframe_indices_,
+                    extradata_);
 }
 
 } // namespace hwang

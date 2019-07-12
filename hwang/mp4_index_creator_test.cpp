@@ -22,8 +22,10 @@
 namespace hwang {
 
 TEST(MP4IndexCreator, SimpleTest) {
-  std::vector<TestVideoInfo> videos = {test_video_fragmented,
-                                       test_video_unfragmented};
+  std::vector<TestVideoInfo> videos = {
+      test_video_fragmented,
+      test_video_unfragmented,
+      test_video_hevc};
 
   for (const auto &video : videos) {
     // Download video file
