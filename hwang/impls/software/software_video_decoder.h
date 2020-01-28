@@ -48,8 +48,10 @@ public:
   Result configure(const FrameInfo &metadata,
                    const std::vector<uint8_t>& extradata) override;
 
-  Result feed(const uint8_t *encoded_buffer, size_t encoded_size, bool keyframe,
-              bool discontinuity = false) override;
+  Result feed(const uint8_t *encoded_buffer, size_t encoded_size,
+              bool keyframe) override;
+
+  Result flush() override;
 
   Result discard_frame() override;
 

@@ -165,8 +165,7 @@ Result SoftwareVideoDecoder::configure(const FrameInfo &metadata,
 }
 
 Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
-                                  size_t encoded_size, bool keyframe,
-                                  bool discontinuity) {
+                                  size_t encoded_size, bool keyframe) {
   uint8_t *filtered_buffer = nullptr;
   int32_t filtered_size = 0;
   int err;
@@ -227,40 +226,6 @@ Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     }
   }
 #endif
-  if (discontinuity) {
-    while (decoded_frame_queue_.size() > 0) {
-      AVFrame* frame;
-      decoded_frame_queue_.pop(frame);
-      av_frame_free(&frame);
-    }
-    while (frame_pool_.size() > 0) {
-      AVFrame* frame;
-      frame_pool_.pop(frame);
-      av_frame_free(&frame);
-    }
-
-    packet_.data = NULL;
-    packet_.size = 0;
-    feed_packet(true);
-
-    if (filtered_buffer) {
-      free(filtered_buffer);
-    }
-    // Reinitialize filter
-    if (annexb_) {
-      av_bitstream_filter_close(annexb_);
-    }
-
-    if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
-      free(cc_->extradata);
-    }
-    cc_->extradata = (uint8_t *)malloc(extradata_.size());
-    memcpy(cc_->extradata, extradata_.data(), extradata_.size());
-    cc_->extradata_size = extradata_.size();
-
-    annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
-    return Result();
-  }
   if (filtered_size > 0) {
     if (av_new_packet(&packet_, filtered_size) < 0) {
       return Result(false,
@@ -279,6 +244,26 @@ Result SoftwareVideoDecoder::feed(const uint8_t *encoded_buffer,
     free(filtered_buffer);
   }
 
+  return Result();
+}
+
+Result SoftwareVideoDecoder::flush() {
+  packet_.data = NULL;
+  packet_.size = 0;
+  feed_packet(true);
+  // Reinitialize filter
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+
+  if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+    free(cc_->extradata);
+  }
+  cc_->extradata = (uint8_t *)malloc(extradata_.size());
+  memcpy(cc_->extradata, extradata_.data(), extradata_.size());
+  cc_->extradata_size = extradata_.size();
+
+  annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
   return Result();
 }
 
@@ -365,7 +350,11 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
   int error;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 25, 0)
   auto send_start = now();
-  error = avcodec_send_packet(cc_, &packet_);
+  if (flush) {
+    error = avcodec_send_packet(cc_, NULL);
+  } else {
+    error = avcodec_send_packet(cc_, &packet_);
+  }
   if (error != AVERROR_EOF) {
     if (error < 0) {
       char err_msg[256];
@@ -378,7 +367,7 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
 
   auto received_start = now();
   bool done = false;
-  while (!done) {
+  while (true) {
     AVFrame* frame;
     {
       if (frame_pool_.size() <= 0) {
@@ -394,15 +383,10 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
       break;
     }
     if (error == 0) {
-      if (!flush) {
-        decoded_frame_queue_.push(frame);
-      } else {
-        av_frame_unref(frame);
-        frame_pool_.push(frame);
-      }
+      decoded_frame_queue_.push(frame);
     } else if (error == AVERROR(EAGAIN)) {
-      done = true;
       frame_pool_.push(frame);
+      break;
     } else {
       char err_msg[256];
       av_strerror(error, err_msg, 256);
@@ -445,23 +429,18 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
       LOG(FATAL) << "Error while decoding frame";
     }
     if (got_picture) {
-      if (!flush) {
-        if (frame->buf[0] == NULL) {
-          // Must copy packet as data is stored statically
-          AVFrame* cloned_frame = av_frame_clone(frame);
-          if (cloned_frame == NULL) {
-            fprintf(stderr, "could not clone frame\n");
-            assert(false);
-          }
-          decoded_frame_queue_.push(cloned_frame);
-          av_frame_free(&frame);
-        } else {
-          // Frame is reference counted so we can just take it directly
-          decoded_frame_queue_.push(frame);
+      if (frame->buf[0] == NULL) {
+        // Must copy packet as data is stored statically
+        AVFrame* cloned_frame = av_frame_clone(frame);
+        if (cloned_frame == NULL) {
+          fprintf(stderr, "could not clone frame\n");
+          assert(false);
         }
+        decoded_frame_queue_.push(cloned_frame);
+        av_frame_free(&frame);
       } else {
-        av_frame_unref(frame);
-        frame_pool_.push(frame);
+        // Frame is reference counted so we can just take it directly
+        decoded_frame_queue_.push(frame);
       }
     } else {
       frame_pool_.push(frame);
@@ -472,7 +451,7 @@ void SoftwareVideoDecoder::feed_packet(bool flush) {
   packet_.data = orig_data;
   packet_.size = orig_size;
 #endif
-  if (packet_.size == 0) {
+  if (flush) {
     avcodec_flush_buffers(cc_);
   }
 }

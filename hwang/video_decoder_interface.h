@@ -36,7 +36,9 @@ class VideoDecoderInterface {
                            const std::vector<uint8_t> &extradata) = 0;
 
   virtual Result feed(const uint8_t *encoded_buffer, size_t encoded_size,
-                      bool keyframe, bool discontinuity = false) = 0;
+                      bool keyframe) = 0;
+
+  virtual Result flush() = 0;
 
   virtual Result discard_frame() = 0;
 

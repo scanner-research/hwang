@@ -64,7 +64,10 @@ DecoderAutomata::~DecoderAutomata() {
     wake_feeder_.wait(lk, [this] { return feeder_waiting_.load(); });
 
     if (frames_retrieved_ > 0) {
-      decoder_->feed(nullptr, 0, false, true);
+      decoder_->flush();
+      while (decoder_->decoded_frames_buffered() > 0) {
+        decoder_->discard_frame();
+      }
     }
     not_done_ = false;
     feeder_waiting_ = false;
@@ -100,7 +103,10 @@ Result DecoderAutomata::initialize(const std::vector<EncodedData> &encoded_data,
   HWANG_RETURN_ON_ERROR(decoder_->configure(info, extradata))
 
   if (frames_retrieved_ > 0) {
-    HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+    HWANG_RETURN_ON_ERROR(decoder_->flush());
+    while (decoder_->decoded_frames_buffered() > 0) {
+      HWANG_RETURN_ON_ERROR(decoder_->discard_frame());
+    }
   }
 
   set_feeder_idx(0);
@@ -137,7 +143,10 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
       // Make sure to not feed seek packet if we reached end of stream
       if (encoded_data_.size() > feeder_data_idx_) {
         if (seeking_) {
-          HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+          while (decoder_->decoded_frames_buffered() > 0) {
+            decoder_->discard_frame();
+            total_frames_decoded++;
+          }
           seeking_ = false;
         }
       }
@@ -196,7 +205,10 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
               }
 
               if (seeking_) {
-                HWANG_RETURN_ON_ERROR(decoder_->feed(nullptr, 0, false, true));
+                while (decoder_->decoded_frames_buffered() > 0) {
+                  decoder_->discard_frame();
+                  total_frames_decoded++;
+                }
                 seeking_ = false;
               }
 
@@ -226,7 +238,7 @@ Result DecoderAutomata::get_frames(uint8_t *buffer, int32_t num_frames) {
         current_frame_++;
         total_frames_decoded++;
       }
-    }
+    } 
     std::this_thread::yield();
   }
   HWANG_RETURN_ON_ERROR(decoder_->wait_until_frames_copied());
@@ -345,12 +357,13 @@ void DecoderAutomata::feeder() {
       // }
 
       Result result = decoder_->feed(encoded_packet, encoded_packet_size,
-                                     is_keyframe, false);
+                                     is_keyframe);
       if (!result.ok) {
         result_set_ = true;
         feeder_result_ = result;
         continue;
       }
+      fprintf(stderr, "feeder current frame %d\n", feeder_current_frame_.load());
 
       if (feeder_current_frame_ == feeder_next_frame_) {
         feeder_valid_idx_++;
@@ -369,8 +382,15 @@ void DecoderAutomata::feeder() {
       // the stream next time
       if (encoded_packet_size == 0) {
         //assert(feeder_buffer_offset_ >= encoded_buffer_size);
-        // Reached the end of a decoded segment so wait for decoder to flush
-        // before moving onto next segment
+        // Reached the end of a decoded segment so flush the internal buffers
+        // of the decoder and wait before moving onto the next segment
+        Result result = decoder_->flush();
+        if (!result.ok) {
+          result_set_ = true;
+          feeder_result_ = result;
+          continue;
+        }
+
         seen_metadata = false;
         seeking_ = true;
         set_feeder_idx(feeder_data_idx_ + 1);

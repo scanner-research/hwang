@@ -279,62 +279,10 @@ Result NVIDIAVideoDecoder::configure(const FrameInfo& metadata,
   return Result();
 }
 
-Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_size,
-                              bool keyframe,
-                              bool discontinuity) {
+Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer,
+                                size_t encoded_size, bool keyframe) {
   CUD_CHECK(cuCtxPushCurrent(cuda_context_));
   cudaSetDevice(device_id_);
-
-  if (discontinuity) {
-    {
-      std::unique_lock<std::mutex> lock(frame_queue_mutex_);
-      while (frame_queue_elements_ > 0) {
-        const auto& dispinfo = frame_queue_[frame_queue_read_pos_];
-        frame_in_use_[dispinfo.picture_index] = false;
-        frame_queue_read_pos_ =
-            (frame_queue_read_pos_ + 1) % max_output_frames_;
-        frame_queue_elements_--;
-      }
-    }
-
-    CUVIDSOURCEDATAPACKET cupkt = {};
-    cupkt.flags |= CUVID_PKT_DISCONTINUITY;
-    CUD_CHECK(cuvidParseVideoData(parser_, &cupkt));
-
-    std::unique_lock<std::mutex> lock(frame_queue_mutex_);
-    last_displayed_frame_ = -1;
-    // Empty queue because we have a new section of frames
-    for (int32_t i = 0; i < max_output_frames_; ++i) {
-      invalid_frames_[i] = undisplayed_frames_[i];
-      undisplayed_frames_[i] = false;
-    }
-    while (frame_queue_elements_ > 0) {
-      const auto& dispinfo = frame_queue_[frame_queue_read_pos_];
-      frame_in_use_[dispinfo.picture_index] = false;
-      frame_queue_read_pos_ = (frame_queue_read_pos_ + 1) % max_output_frames_;
-      frame_queue_elements_--;
-    }
-
-    // For bitstream filtering
-    if (annexb_) {
-      av_bitstream_filter_close(annexb_);
-    }
-
-    if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
-      free(cc_->extradata);
-    }
-    cc_->extradata = (uint8_t *)malloc(metadata_packets_.size() +
-                                       AV_INPUT_BUFFER_PADDING_SIZE);
-    memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
-    cc_->extradata_size = metadata_packets_.size();
-
-    annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
-    // For bitstream filtering
-
-    CUcontext dummy;
-    CUD_CHECK(cuCtxPopCurrent(&dummy));
-    return Result();
-  }
 
   // BITSTREAM FILTERING
   uint8_t *filtered_buffer = nullptr;
@@ -410,6 +358,36 @@ Result NVIDIAVideoDecoder::feed(const uint8_t* encoded_buffer, size_t encoded_si
     free(filtered_buffer);
   }
 
+  return Result();
+}
+
+Result NVIDIAVideoDecoder::flush() {
+  CUD_CHECK(cuCtxPushCurrent(cuda_context_));
+  cudaSetDevice(device_id_);
+
+  // Send flush packet
+  CUVIDSOURCEDATAPACKET cupkt = {};
+  cupkt.flags |= CUVID_PKT_ENDOFSTREAM;
+  CUD_CHECK(cuvidParseVideoData(parser_, &cupkt));
+
+  // Feed metadata packets after EOS to reinit decoder
+  if (annexb_) {
+    av_bitstream_filter_close(annexb_);
+  }
+
+  if (cc_->extradata_size > 0 && cc_->extradata != nullptr) {
+    free(cc_->extradata);
+  }
+  cc_->extradata = (uint8_t *)malloc(metadata_packets_.size() +
+                                     AV_INPUT_BUFFER_PADDING_SIZE);
+  memcpy(cc_->extradata, metadata_packets_.data(), metadata_packets_.size());
+  cc_->extradata_size = metadata_packets_.size();
+
+  annexb_ = av_bitstream_filter_init(bitstream_filter_name_.c_str());
+  // For bitstream filtering
+
+  CUcontext dummy;
+  CUD_CHECK(cuCtxPopCurrent(&dummy));
   return Result();
 }
 
