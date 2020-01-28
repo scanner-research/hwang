@@ -35,10 +35,10 @@ module1 = Extension(
 
 setup(
     name='hwang',
-    version='0.5.0',
+    version='0.5.1',
     url='https://github.com/scanner-research/hwang',
-    author='Alex Poms',
-    author_email='apoms@cs.cmu.edu',
+    author='Fait Poms',
+    author_email='fpoms@cs.cmu.edu',
     packages=['hwang'],
     install_requires=REQUIRED_PACKAGES,
     license='Apache 2.0',
