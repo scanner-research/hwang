@@ -46,3 +46,7 @@ make -j
 cd ..
 bash build.sh
 ```
+
+## Deploy on AWS Lambda
+
+You can refer to [this tutorial](./lambda.md) if you would like to deploy Hwang on AWS Lambda.
